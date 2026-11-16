@@ -28,6 +28,16 @@
       "expo-router",
       "@react-native-community/datetimepicker",
       "./plugins/withNoteInLockScreen.js"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "29671b15-7523-4204-90db-c900da8f943d"
+      }
+    }
   }
 }

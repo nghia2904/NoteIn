@@ -58,10 +58,12 @@ export interface FreeTimeSuggestion {
 }
 
 export function findFreeTimeSuggestions(
-  items: TimelineItem[],
+  dailies: DailyTemplate[],
+  events: EventItem[],
+  date: string,
   durationMin: number,
   preferredStartMin: number,
-  excludedKey: string,
+  excludedDailyId: string,
 ): FreeTimeSuggestion[] {
   const windowStartMin = 5 * 60;
   const windowEndMin = 22 * 60;
@@ -75,16 +77,28 @@ export function findFreeTimeSuggestions(
     return [];
   }
 
-  const busy = items
+  const busy = [
+    ...dailies
+      .filter((daily) => daily.isActive && daily.id !== excludedDailyId)
+      .map((daily) => ({
+        startMin: daily.startMin,
+        endMin: daily.startMin + daily.durationMin,
+      })),
+    ...events
+      .filter((event) => event.date === date)
+      .map((event) => ({
+        startMin: event.startMin,
+        endMin: event.startMin + (event.durationMin ?? 60),
+      })),
+  ]
     .filter(
-      (item) =>
-        item.key !== excludedKey &&
-        item.startMin < windowEndMin &&
-        item.endMin > windowStartMin,
+      (interval) =>
+        interval.startMin < windowEndMin &&
+        interval.endMin > windowStartMin,
     )
-    .map((item) => ({
-      startMin: Math.max(item.startMin, windowStartMin),
-      endMin: Math.min(item.endMin, windowEndMin),
+    .map((interval) => ({
+      startMin: Math.max(interval.startMin, windowStartMin),
+      endMin: Math.min(interval.endMin, windowEndMin),
     }))
     .sort((a, b) => a.startMin - b.startMin);
 

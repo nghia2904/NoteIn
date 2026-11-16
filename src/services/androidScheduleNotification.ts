@@ -9,6 +9,14 @@ import type { DailyTemplate, EventItem } from '../types/schedule';
 const NOTIFICATION_ID = 'notein.android.current-schedule';
 const CHANNEL_ID = 'notein-current-schedule';
 let channelCreated = false;
+let notificationPosted = false;
+let notificationObserved = false;
+let syncInFlight: Promise<AndroidScheduleNotificationSyncStatus> | undefined;
+
+export type AndroidScheduleNotificationSyncStatus =
+  | 'active'
+  | 'pending'
+  | 'dismissed';
 
 if (Platform.OS === 'android') {
   Notifications.setNotificationHandler({
@@ -70,10 +78,10 @@ async function postCurrentSchedule(
 
   if (currentState.kind === 'current') {
     title = currentState.item.title;
-    body = `${formatTime(currentState.item.startMin)}–${formatTime(currentState.item.endMin)} · ${currentState.minutesLeft} ${t.minutesLeft}`;
+    body = `${formatTime(currentState.item.startMin)}–${formatTime(currentState.item.endMin)}`;
   } else if (currentState.kind === 'upcoming') {
     title = currentState.item.title;
-    body = `${formatTime(currentState.item.startMin)}–${formatTime(currentState.item.endMin)} · ${currentState.minutesUntil} ${t.minutesUntil}`;
+    body = `${formatTime(currentState.item.startMin)}–${formatTime(currentState.item.endMin)}`;
   } else if (currentState.kind === 'finished') {
     title = t.finishedToday;
     body = t.finishedToday;
@@ -97,9 +105,14 @@ async function postCurrentSchedule(
 export async function isAndroidScheduleNotificationActive(): Promise<boolean> {
   if (Platform.OS !== 'android') return false;
   const presented = await Notifications.getPresentedNotificationsAsync();
-  return presented.some(
+  const active = presented.some(
     (notification) => notification.request.identifier === NOTIFICATION_ID,
   );
+  if (active) {
+    notificationPosted = true;
+    notificationObserved = true;
+  }
+  return active;
 }
 
 export async function enableAndroidScheduleNotification(
@@ -111,6 +124,7 @@ export async function enableAndroidScheduleNotification(
 ): Promise<boolean> {
   if (Platform.OS !== 'android') return false;
 
+  await ensureNotificationChannel(language);
   const currentPermission = await Notifications.getPermissionsAsync();
   const permission =
     currentPermission.status === 'granted'
@@ -119,6 +133,8 @@ export async function enableAndroidScheduleNotification(
   if (permission.status !== 'granted') return false;
 
   await postCurrentSchedule(dailies, events, completions, now, language);
+  notificationPosted = true;
+  notificationObserved = false;
   return true;
 }
 
@@ -132,6 +148,8 @@ export async function disableAndroidScheduleNotification(): Promise<void> {
   if (scheduled.some((notification) => notification.identifier === NOTIFICATION_ID)) {
     await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID);
   }
+  notificationPosted = false;
+  notificationObserved = false;
 }
 
 export async function syncAndroidScheduleNotification(
@@ -140,12 +158,30 @@ export async function syncAndroidScheduleNotification(
   completions: Record<string, true>,
   now: Date,
   language: Language,
-): Promise<boolean> {
-  if (Platform.OS !== 'android') return false;
+): Promise<AndroidScheduleNotificationSyncStatus> {
+  if (Platform.OS !== 'android') return 'dismissed';
+  if (syncInFlight) return syncInFlight;
 
-  const active = await isAndroidScheduleNotificationActive();
-  if (!active) return false;
+  const sync = (async (): Promise<AndroidScheduleNotificationSyncStatus> => {
+    const active = await isAndroidScheduleNotificationActive();
+    if (active) {
+      await postCurrentSchedule(dailies, events, completions, now, language);
+      return 'active';
+    }
 
-  await postCurrentSchedule(dailies, events, completions, now, language);
-  return true;
+    if (notificationObserved || !notificationPosted) {
+      notificationPosted = false;
+      return 'dismissed';
+    }
+
+    await postCurrentSchedule(dailies, events, completions, now, language);
+    return 'pending';
+  })();
+  syncInFlight = sync;
+
+  try {
+    return await sync;
+  } finally {
+    if (syncInFlight === sync) syncInFlight = undefined;
+  }
 }

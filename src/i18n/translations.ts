@@ -52,7 +52,7 @@ export const translations = {
     noFreeTimeSuggestions: 'Không có khung giờ trống đủ dài từ 05:00 đến 22:00.',
     applySuggestionTitle: 'Đổi giờ khung Daily?',
     applySuggestionMessage:
-      'Khung Daily lặp lại. Giờ mới sẽ áp dụng cho tất cả ngày lặp, không chỉ hôm nay.',
+      'Khung Daily lặp lại. Giờ mới sẽ áp dụng cho tất cả ngày lặp, không chỉ hôm nay. Sự kiện ở ngày khác chưa được kiểm tra.',
     applySuggestionBtn: 'Tiếp tục chỉnh sửa',
     noNote: 'Không có ghi chú',
     eventBadge: 'Sự kiện',
@@ -190,7 +190,7 @@ export const translations = {
     noFreeTimeSuggestions: 'No free interval long enough was found between 5:00 and 22:00.',
     applySuggestionTitle: 'Change this Daily time?',
     applySuggestionMessage:
-      'Daily slots repeat. The new time will apply to every matching day, not only today.',
+      'Daily slots repeat. The new time will apply to every matching day, not only today. Events on other dates are not checked.',
     applySuggestionBtn: 'Continue editing',
     noNote: 'No notes',
     eventBadge: 'Event',

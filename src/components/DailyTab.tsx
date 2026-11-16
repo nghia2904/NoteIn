@@ -56,7 +56,7 @@ export function DailyTab({
   externalEditorOpen,
   onExternalEditorHandled,
 }: DailyTabProps) {
-  const { language, theme, dailies } = useScheduleStore();
+  const { language, theme, dailies, events } = useScheduleStore();
   const t = translations[language];
   const isDark = theme === 'dark';
   const dateLocale = language === 'vi' ? vi : enUS;
@@ -112,10 +112,12 @@ export function DailyTab({
 
   const handleFindFreeTime = (item: TimelineItem) => {
     const suggestions = findFreeTimeSuggestions(
-      timeline,
+      dailies,
+      events,
+      item.date,
       item.endMin - item.startMin,
       item.startMin,
-      item.key,
+      item.refId,
     );
 
     if (suggestions.length === 0) {

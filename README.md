@@ -10,8 +10,8 @@ Tài liệu này mô tả **hành vi đang có trong mã nguồn hiện tại**.
 - **Đánh dấu hoàn thành:** trạng thái hoàn thành của một mục lịch ngày được lưu theo cặp `dailyId + ngày`.
 - **Lịch bàn:** xem lịch theo tháng, chọn ngày, thêm và xóa sự kiện; ngày có sự kiện được đánh dấu trên lưới lịch.
 - **Cài đặt và thống kê:** chuyển tiếng Việt/tiếng Anh, đổi giao diện sáng/tối, khôi phục dữ liệu mẫu và xem thống kê đơn giản.
-- **Gợi ý giờ trống trên Android:** với khung Daily bị trùng, tìm tối đa ba giờ thay thế theo bước 15 phút trong khoảng 05:00–22:00. Người dùng xác nhận trước khi mở form chỉnh sửa; đổi giờ Daily sẽ tác động mọi ngày lặp.
-- **Thông báo lịch hiện tại trên Android:** người dùng bật/tắt trong mục Other. Notification được làm mới khi app đang mở; người dùng có thể gỡ notification và app không tự đăng lại nếu nó không còn được hệ thống hiển thị.
+- **Gợi ý giờ trống trên Android:** với khung Daily bị trùng, tìm tối đa ba giờ thay thế theo bước 15 phút trong khoảng 05:00–22:00. Gợi ý tính mọi Daily đang hoạt động và sự kiện của ngày đang xem; sự kiện ở ngày khác chưa được kiểm tra. Người dùng xác nhận trước khi mở form chỉnh sửa; đổi giờ Daily sẽ tác động mọi ngày lặp.
+- **Thông báo lịch hiện tại trên Android:** người dùng bật/tắt trong mục Other. Notification được làm mới khi app đang mở; trước khi xác nhận notification đã hiển thị, app thử đăng lại nếu hệ thống chưa trả về notification. Sau khi đã xác nhận hiển thị, nếu notification biến mất thì app coi đó là người dùng đã gỡ và không đăng lại.
 - **iOS Live Activity:** gửi lịch trong ngày từ JavaScript sang native iOS để hiển thị trên màn hình khóa và Dynamic Island. Live Activity có chế độ Daily và Calendar.
 - **Web:** giao diện React Native Web có thể chạy bằng Expo. Phần native iOS Live Activity không có trên web.
 

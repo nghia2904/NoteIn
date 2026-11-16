@@ -57,7 +57,7 @@ export default function HomeScreen() {
     let active = true;
     isAndroidScheduleNotificationActive()
       .then((enabled) => {
-        if (active) setAndroidNotificationEnabled(enabled);
+        if (active && enabled) setAndroidNotificationEnabled(true);
       })
       .catch((error) => {
         console.warn('Failed to read Android notification state:', error);
@@ -78,8 +78,8 @@ export default function HomeScreen() {
       now,
       language,
     )
-      .then((active) => {
-        if (!active) setAndroidNotificationEnabled(false);
+      .then((status) => {
+        if (status === 'dismissed') setAndroidNotificationEnabled(false);
       })
       .catch((error) => {
         console.warn('Failed to update Android schedule notification:', error);
@@ -108,8 +108,8 @@ export default function HomeScreen() {
           new Date(),
           language,
         )
-          .then((active) => {
-            if (!active) setAndroidNotificationEnabled(false);
+          .then((status) => {
+            if (status === 'dismissed') setAndroidNotificationEnabled(false);
           })
           .catch((error) => {
             console.warn('Failed to refresh Android schedule notification:', error);

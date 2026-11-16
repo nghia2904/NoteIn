@@ -132,54 +132,84 @@ describe('schedule engine', () => {
     expect(right?.conflictWith).toEqual(expect.arrayContaining([left?.key ?? '']));
   });
 
-  test('free-time suggestions merge overlaps and prefer the nearest available start', () => {
-    const items = buildTimeline(
-      [
-        { ...dailyA, id: 'first', startMin: 8 * 60, durationMin: 120 },
-        { ...dailyA, id: 'overlap', startMin: 9 * 60, durationMin: 120 },
-      ],
-      [],
-      {},
+  test('free-time suggestions include Dailies on other repeat days and events on the selected date', () => {
+    const weekdayDaily: DailyTemplate = {
+      ...dailyA,
+      id: 'weekday',
+      startMin: 9 * 60,
+      durationMin: 60,
+      repeat: { type: 'weekdays', days: [1] },
+    };
+    const selectedDateEvent: EventItem = {
+      id: 'selected-date-event',
+      title: 'Meeting',
+      date: '2026-11-10',
+      startMin: 11 * 60,
+      durationMin: 60,
+    };
+    const otherDateEvent: EventItem = {
+      ...selectedDateEvent,
+      id: 'other-date-event',
+      date: '2026-11-11',
+      startMin: 12 * 60,
+    };
+
+    const suggestions = findFreeTimeSuggestions(
+      [weekdayDaily],
+      [selectedDateEvent, otherDateEvent],
       '2026-11-10',
+      60,
+      9 * 60 + 30,
+      'selected',
     );
 
-    expect(findFreeTimeSuggestions(items, 60, 9 * 60 + 30, 'missing')[0]).toEqual({
-      startMin: 11 * 60,
-      endMin: 12 * 60,
+    expect(suggestions).not.toContainEqual({
+      startMin: 9 * 60 + 30,
+      endMin: 10 * 60 + 30,
+    });
+    expect(suggestions).toContainEqual({
+      startMin: 12 * 60,
+      endMin: 13 * 60,
     });
   });
 
-  test('free-time suggestions exclude the selected item and respect exact boundaries', () => {
+  test('free-time suggestions exclude the edited Daily template by id', () => {
     const selected = {
       ...dailyA,
       id: 'selected',
       startMin: 9 * 60,
       durationMin: 60,
     };
-    const blocker = {
-      ...dailyA,
-      id: 'blocker',
-      startMin: 10 * 60,
-      durationMin: 60,
-    };
-    const items = buildTimeline([selected, blocker], [], {}, '2026-11-10');
-    const selectedItem = items.find((item) => item.refId === 'selected');
 
-    expect(selectedItem).toBeDefined();
     expect(
-      findFreeTimeSuggestions(items, 60, 9 * 60, selectedItem?.key ?? ''),
+      findFreeTimeSuggestions([selected], [], '2026-11-10', 60, 9 * 60, 'selected'),
     ).toContainEqual({ startMin: 9 * 60, endMin: 10 * 60 });
   });
 
-  test('free-time suggestions return no result when no interval is long enough', () => {
-    const items = buildTimeline(
-      [{ ...dailyA, startMin: 5 * 60, durationMin: 17 * 60 }],
-      [],
-      {},
-      '2026-11-10',
-    );
+  test('free-time suggestions merge overlapping busy intervals and prefer the nearest start', () => {
+    const first = { ...dailyA, id: 'first', startMin: 8 * 60, durationMin: 120 };
+    const overlap = { ...dailyA, id: 'overlap', startMin: 9 * 60, durationMin: 120 };
 
-    expect(findFreeTimeSuggestions(items, 30, 12 * 60, 'missing')).toEqual([]);
-    expect(findFreeTimeSuggestions(items, 0, 12 * 60, 'missing')).toEqual([]);
+    expect(
+      findFreeTimeSuggestions(
+        [first, overlap],
+        [],
+        '2026-11-10',
+        60,
+        9 * 60 + 30,
+        'missing',
+      )[0],
+    ).toEqual({ startMin: 11 * 60, endMin: 12 * 60 });
+  });
+
+  test('free-time suggestions return no result when no interval is long enough', () => {
+    const fullDay = [{ ...dailyA, startMin: 5 * 60, durationMin: 17 * 60 }];
+
+    expect(
+      findFreeTimeSuggestions(fullDay, [], '2026-11-10', 30, 12 * 60, 'missing'),
+    ).toEqual([]);
+    expect(
+      findFreeTimeSuggestions(fullDay, [], '2026-11-10', 0, 12 * 60, 'missing'),
+    ).toEqual([]);
   });
 });

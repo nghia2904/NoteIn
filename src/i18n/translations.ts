@@ -47,6 +47,13 @@ export const translations = {
     minutesUntil: 'phút nữa',
     progressLabel: 'Tiến độ khung giờ',
     conflictWarning: 'Trùng giờ',
+    findFreeTimeBtn: 'Gợi ý giờ',
+    freeTimeSuggestionsTitle: 'Khung giờ có thể chuyển tới',
+    noFreeTimeSuggestions: 'Không có khung giờ trống đủ dài từ 05:00 đến 22:00.',
+    applySuggestionTitle: 'Đổi giờ khung Daily?',
+    applySuggestionMessage:
+      'Khung Daily lặp lại. Giờ mới sẽ áp dụng cho tất cả ngày lặp, không chỉ hôm nay.',
+    applySuggestionBtn: 'Tiếp tục chỉnh sửa',
     noNote: 'Không có ghi chú',
     eventBadge: 'Sự kiện',
     dailyBadge: 'Hằng ngày',
@@ -101,6 +108,15 @@ export const translations = {
     langEnglish: 'English',
 
     sectionLockScreen: 'Tùy chỉnh Màn hình khóa & Thông báo',
+    androidScheduleNotification: 'Thông báo lịch hiện tại (Android)',
+    androidScheduleNotificationSub:
+      'Cập nhật khi mở app; có thể bị gỡ trên một số phiên bản Android.',
+    androidScheduleNotificationEnabled: 'Đang bật · chạm để tắt',
+    androidScheduleNotificationDisabled: 'Đang tắt · chạm để bật',
+    androidScheduleNotificationChannel: 'Lịch hiện tại',
+    androidSchedulePermissionDenied:
+      'Chưa được cấp quyền thông báo. Hãy bật quyền trong cài đặt Android để sử dụng tính năng này.',
+    androidNotificationError: 'Không thể cập nhật thông báo Android lúc này.',
     settingOpenTransparentLS: 'Mở giao diện Màn hình khóa',
     settingOpenTransparentLSSub: 'Xem 3 chế độ: Lịch Daily · Lịch Bàn · Ẩn Lịch',
     settingPushOSLockScreen: 'Làm mới thông báo Lịch Bàn (Trước 1 tuần)',
@@ -169,6 +185,13 @@ export const translations = {
     minutesUntil: 'min until',
     progressLabel: 'Slot Progress',
     conflictWarning: 'Overlap',
+    findFreeTimeBtn: 'Suggest a time',
+    freeTimeSuggestionsTitle: 'Available time suggestions',
+    noFreeTimeSuggestions: 'No free interval long enough was found between 5:00 and 22:00.',
+    applySuggestionTitle: 'Change this Daily time?',
+    applySuggestionMessage:
+      'Daily slots repeat. The new time will apply to every matching day, not only today.',
+    applySuggestionBtn: 'Continue editing',
     noNote: 'No notes',
     eventBadge: 'Event',
     dailyBadge: 'Daily',
@@ -223,6 +246,15 @@ export const translations = {
     langEnglish: 'English',
 
     sectionLockScreen: 'Lock Screen & Notification Settings',
+    androidScheduleNotification: 'Current schedule notification (Android)',
+    androidScheduleNotificationSub:
+      'Updates while the app is open; it may be dismissed on some Android versions.',
+    androidScheduleNotificationEnabled: 'On · tap to turn off',
+    androidScheduleNotificationDisabled: 'Off · tap to turn on',
+    androidScheduleNotificationChannel: 'Current schedule',
+    androidSchedulePermissionDenied:
+      'Notification permission was not granted. Enable it in Android settings to use this feature.',
+    androidNotificationError: 'The Android notification could not be updated.',
     settingOpenTransparentLS: 'Open Lock Screen View',
     settingOpenTransparentLSSub: 'View 3 modes: Daily · Desk Calendar · Hidden',
     settingPushOSLockScreen: 'Refresh Desk Calendar Alerts (1 Week Prior)',

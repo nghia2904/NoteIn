@@ -52,6 +52,89 @@ export function detectConflicts(a: Pick<TimelineItem, 'startMin' | 'endMin'>, b:
   return a.startMin < b.endMin && b.startMin < a.endMin;
 }
 
+export interface FreeTimeSuggestion {
+  startMin: number;
+  endMin: number;
+}
+
+export function findFreeTimeSuggestions(
+  items: TimelineItem[],
+  durationMin: number,
+  preferredStartMin: number,
+  excludedKey: string,
+): FreeTimeSuggestion[] {
+  const windowStartMin = 5 * 60;
+  const windowEndMin = 22 * 60;
+  const stepMin = 15;
+
+  if (
+    !Number.isInteger(durationMin) ||
+    durationMin <= 0 ||
+    durationMin > windowEndMin - windowStartMin
+  ) {
+    return [];
+  }
+
+  const busy = items
+    .filter(
+      (item) =>
+        item.key !== excludedKey &&
+        item.startMin < windowEndMin &&
+        item.endMin > windowStartMin,
+    )
+    .map((item) => ({
+      startMin: Math.max(item.startMin, windowStartMin),
+      endMin: Math.min(item.endMin, windowEndMin),
+    }))
+    .sort((a, b) => a.startMin - b.startMin);
+
+  const merged: { startMin: number; endMin: number }[] = [];
+  for (const interval of busy) {
+    const previous = merged[merged.length - 1];
+    if (!previous || interval.startMin > previous.endMin) {
+      merged.push({ ...interval });
+    } else {
+      previous.endMin = Math.max(previous.endMin, interval.endMin);
+    }
+  }
+
+  const gaps: { startMin: number; endMin: number }[] = [];
+  let cursor = windowStartMin;
+  for (const interval of merged) {
+    if (interval.startMin > cursor) {
+      gaps.push({ startMin: cursor, endMin: interval.startMin });
+    }
+    cursor = Math.max(cursor, interval.endMin);
+  }
+  if (cursor < windowEndMin) {
+    gaps.push({ startMin: cursor, endMin: windowEndMin });
+  }
+
+  const alignedPreferredStart = Math.round(preferredStartMin / stepMin) * stepMin;
+
+  return gaps
+    .map((gap) => {
+      const earliestStart = Math.ceil(gap.startMin / stepMin) * stepMin;
+      const latestStart =
+        Math.floor((gap.endMin - durationMin) / stepMin) * stepMin;
+      if (earliestStart > latestStart) return undefined;
+
+      const startMin = Math.max(
+        earliestStart,
+        Math.min(alignedPreferredStart, latestStart),
+      );
+      return { startMin, endMin: startMin + durationMin };
+    })
+    .filter((suggestion): suggestion is FreeTimeSuggestion => suggestion !== undefined)
+    .sort(
+      (a, b) =>
+        Math.abs(a.startMin - preferredStartMin) -
+          Math.abs(b.startMin - preferredStartMin) ||
+        a.startMin - b.startMin,
+    )
+    .slice(0, 3);
+}
+
 export function buildTimeline(
   dailies: DailyTemplate[],
   events: EventItem[],

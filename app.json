@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.bonhiki1233.NoteIn"
     },
     "android": {
+      "package": "com.bonhiki1233.notein",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

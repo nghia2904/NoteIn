@@ -1,4 +1,9 @@
-import { buildTimeline, detectConflicts, getCurrentState } from './schedule';
+import {
+  buildTimeline,
+  detectConflicts,
+  findFreeTimeSuggestions,
+  getCurrentState,
+} from './schedule';
 import type { DailyTemplate, EventItem } from '../types/schedule';
 
 const dailyA: DailyTemplate = {
@@ -125,5 +130,56 @@ describe('schedule engine', () => {
     const right = items.find((item) => item.title === 'Right item');
     expect(left?.conflictWith).toEqual(expect.arrayContaining([right?.key ?? '']));
     expect(right?.conflictWith).toEqual(expect.arrayContaining([left?.key ?? '']));
+  });
+
+  test('free-time suggestions merge overlaps and prefer the nearest available start', () => {
+    const items = buildTimeline(
+      [
+        { ...dailyA, id: 'first', startMin: 8 * 60, durationMin: 120 },
+        { ...dailyA, id: 'overlap', startMin: 9 * 60, durationMin: 120 },
+      ],
+      [],
+      {},
+      '2026-11-10',
+    );
+
+    expect(findFreeTimeSuggestions(items, 60, 9 * 60 + 30, 'missing')[0]).toEqual({
+      startMin: 11 * 60,
+      endMin: 12 * 60,
+    });
+  });
+
+  test('free-time suggestions exclude the selected item and respect exact boundaries', () => {
+    const selected = {
+      ...dailyA,
+      id: 'selected',
+      startMin: 9 * 60,
+      durationMin: 60,
+    };
+    const blocker = {
+      ...dailyA,
+      id: 'blocker',
+      startMin: 10 * 60,
+      durationMin: 60,
+    };
+    const items = buildTimeline([selected, blocker], [], {}, '2026-11-10');
+    const selectedItem = items.find((item) => item.refId === 'selected');
+
+    expect(selectedItem).toBeDefined();
+    expect(
+      findFreeTimeSuggestions(items, 60, 9 * 60, selectedItem?.key ?? ''),
+    ).toContainEqual({ startMin: 9 * 60, endMin: 10 * 60 });
+  });
+
+  test('free-time suggestions return no result when no interval is long enough', () => {
+    const items = buildTimeline(
+      [{ ...dailyA, startMin: 5 * 60, durationMin: 17 * 60 }],
+      [],
+      {},
+      '2026-11-10',
+    );
+
+    expect(findFreeTimeSuggestions(items, 30, 12 * 60, 'missing')).toEqual([]);
+    expect(findFreeTimeSuggestions(items, 0, 12 * 60, 'missing')).toEqual([]);
   });
 });

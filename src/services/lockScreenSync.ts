@@ -44,17 +44,13 @@ export interface LockScreenPayload {
 }
 
 /**
- * Clears any legacy notifications.
+ * Clears legacy notifications on iOS without touching Android notifications.
  */
 export async function clearAllNotifications(): Promise<void> {
-  if (Platform.OS === 'web') return;
-  try {
-    const Notifications = await import('expo-notifications');
-    await Notifications.dismissAllNotificationsAsync();
-    await Notifications.cancelAllScheduledNotificationsAsync();
-  } catch {
-    // Ignore
-  }
+  if (Platform.OS !== 'ios') return;
+  const Notifications = await import('expo-notifications');
+  await Notifications.dismissAllNotificationsAsync();
+  await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
 /**

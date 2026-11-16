@@ -5,6 +5,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { deleteDaily, saveDaily } from '../api/schedule.api';
-import { getCurrentState } from '../engine/schedule';
+import { findFreeTimeSuggestions, getCurrentState } from '../engine/schedule';
 import { type Language, translations } from '../i18n/translations';
 import { useScheduleStore } from '../store/scheduleStore';
 import type { DailyTemplate, TimelineItem } from '../types/schedule';
@@ -85,17 +86,53 @@ export function DailyTab({
     setEditorVisible(true);
   };
 
-  const openEditSlotModal = (refId: string) => {
+  const openEditSlotModal = (refId: string, suggestedStartMin?: number) => {
     const found = dailies.find((d) => d.id === refId);
     if (!found) return;
+    const startMin = suggestedStartMin ?? found.startMin;
     setDailyForm({
       id: found.id,
       title: found.title,
       note: found.note ?? '',
-      start: formatTimeMinutes(found.startMin),
-      end: formatTimeMinutes(found.startMin + found.durationMin),
+      start: formatTimeMinutes(startMin),
+      end: formatTimeMinutes(startMin + found.durationMin),
     });
     setEditorVisible(true);
+  };
+
+  const handleApplyTimeSuggestion = (item: TimelineItem, startMin: number) => {
+    Alert.alert(t.applySuggestionTitle, t.applySuggestionMessage, [
+      { text: t.cancelBtn, style: 'cancel' },
+      {
+        text: t.applySuggestionBtn,
+        onPress: () => openEditSlotModal(item.refId, startMin),
+      },
+    ]);
+  };
+
+  const handleFindFreeTime = (item: TimelineItem) => {
+    const suggestions = findFreeTimeSuggestions(
+      timeline,
+      item.endMin - item.startMin,
+      item.startMin,
+      item.key,
+    );
+
+    if (suggestions.length === 0) {
+      Alert.alert(t.freeTimeSuggestionsTitle, t.noFreeTimeSuggestions);
+      return;
+    }
+
+    const suggestionButtons = suggestions.slice(0, 2).map((suggestion) => ({
+      text: `${formatTimeMinutes(suggestion.startMin)}–${formatTimeMinutes(suggestion.endMin)}`,
+      onPress: () => handleApplyTimeSuggestion(item, suggestion.startMin),
+    }));
+
+    Alert.alert(
+      t.freeTimeSuggestionsTitle,
+      `${item.title} · ${formatTimeMinutes(item.startMin)}–${formatTimeMinutes(item.endMin)}`,
+      [...suggestionButtons, { text: t.closeBtn, style: 'cancel' }],
+    );
   };
 
   const handleSaveSlot = async () => {
@@ -310,6 +347,14 @@ export function DailyTab({
                       >
                         <Text style={styles.inlineDeleteText}>{t.deleteBtn}</Text>
                       </Pressable>
+                      {Platform.OS === 'android' && hasConflict && (
+                        <Pressable
+                          onPress={() => handleFindFreeTime(item)}
+                          style={styles.inlineBtn}
+                        >
+                          <Text style={styles.inlineBtnText}>{t.findFreeTimeBtn}</Text>
+                        </Pressable>
+                      )}
                     </View>
                   )}
                 </View>

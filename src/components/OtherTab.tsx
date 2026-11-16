@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  Platform,
   View,
 } from 'react-native';
 import { translations } from '../i18n/translations';
@@ -16,12 +17,16 @@ interface OtherTabProps {
   timeline: TimelineItem[];
   onSyncOS: () => void;
   onOpenAddDaily: () => void;
+  androidNotificationEnabled: boolean;
+  onToggleAndroidNotification: () => void;
 }
 
 export function OtherTab({
   timeline,
   onSyncOS,
   onOpenAddDaily,
+  androidNotificationEnabled,
+  onToggleAndroidNotification,
 }: OtherTabProps) {
   const {
     language,
@@ -113,30 +118,66 @@ export function OtherTab({
           </Pressable>
         </View>
 
-        {/* Group 2: Real iOS Lock Screen Live Activity Sync */}
-        <Text style={[styles.groupLabel, isDark && styles.subTextDark]}>
-          {t.sectionLockScreen}
-        </Text>
-        <View style={[styles.groupCard, isDark && styles.groupCardDark]}>
-          <Pressable onPress={onSyncOS} style={styles.row}>
-            <View style={styles.iconBox}>
-              <Text style={styles.orangeIcon}>📱</Text>
+        {Platform.OS !== 'android' && (
+          <>
+            <Text style={[styles.groupLabel, isDark && styles.subTextDark]}>
+              {t.sectionLockScreen}
+            </Text>
+            <View style={[styles.groupCard, isDark && styles.groupCardDark]}>
+              <Pressable onPress={onSyncOS} style={styles.row}>
+                <View style={styles.iconBox}>
+                  <Text style={styles.orangeIcon}>📱</Text>
+                </View>
+                <View style={styles.rowContent}>
+                  <Text style={[styles.rowTitle, isDark && styles.textDark]}>
+                    {language === 'vi'
+                      ? 'Cập nhật Widget Màn hình khóa iOS'
+                      : 'Sync iOS Lock Screen Live Activity'}
+                  </Text>
+                  <Text style={[styles.rowSub, isDark && styles.subTextDark]}>
+                    {language === 'vi'
+                      ? 'Hiển thị Lịch Daily / Lịch Bàn trong suốt ngay dưới đồng hồ khóa'
+                      : 'Display transparent Daily / Desk Calendar below Lock Screen clock'}
+                  </Text>
+                </View>
+                <Text style={styles.checkIcon}>✓</Text>
+              </Pressable>
             </View>
-            <View style={styles.rowContent}>
-              <Text style={[styles.rowTitle, isDark && styles.textDark]}>
-                {language === 'vi'
-                  ? 'Cập nhật Widget Màn hình khóa iOS'
-                  : 'Sync iOS Lock Screen Live Activity'}
-              </Text>
-              <Text style={[styles.rowSub, isDark && styles.subTextDark]}>
-                {language === 'vi'
-                  ? 'Hiển thị Lịch Daily / Lịch Bàn trong suốt ngay dưới đồng hồ khóa'
-                  : 'Display transparent Daily / Desk Calendar below Lock Screen clock'}
-              </Text>
+          </>
+        )}
+
+        {Platform.OS === 'android' && (
+          <>
+            <Text style={[styles.groupLabel, isDark && styles.subTextDark]}>
+              {t.sectionLockScreen}
+            </Text>
+            <View style={[styles.groupCard, isDark && styles.groupCardDark]}>
+              <Pressable
+                onPress={onToggleAndroidNotification}
+                style={styles.row}
+                accessibilityRole="button"
+                accessibilityState={{ checked: androidNotificationEnabled }}
+              >
+                <View style={styles.iconBox}>
+                  <Text style={styles.orangeIcon}>🔔</Text>
+                </View>
+                <View style={styles.rowContent}>
+                  <Text style={[styles.rowTitle, isDark && styles.textDark]}>
+                    {t.androidScheduleNotification}
+                  </Text>
+                  <Text style={[styles.rowSub, isDark && styles.subTextDark]}>
+                    {androidNotificationEnabled
+                      ? `${t.androidScheduleNotificationEnabled}. ${t.androidScheduleNotificationSub}`
+                      : `${t.androidScheduleNotificationDisabled}. ${t.androidScheduleNotificationSub}`}
+                  </Text>
+                </View>
+                <Text style={androidNotificationEnabled ? styles.checkIcon : styles.chevron}>
+                  {androidNotificationEnabled ? '✓' : '›'}
+                </Text>
+              </Pressable>
             </View>
-            <Text style={styles.checkIcon}>✓</Text>
-          </Pressable>
-        </View>
+          </>
+        )}
 
         {/* Group 3: Appearance & Data */}
         <Text style={[styles.groupLabel, isDark && styles.subTextDark]}>

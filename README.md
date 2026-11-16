@@ -10,6 +10,8 @@ Tài liệu này mô tả **hành vi đang có trong mã nguồn hiện tại**.
 - **Đánh dấu hoàn thành:** trạng thái hoàn thành của một mục lịch ngày được lưu theo cặp `dailyId + ngày`.
 - **Lịch bàn:** xem lịch theo tháng, chọn ngày, thêm và xóa sự kiện; ngày có sự kiện được đánh dấu trên lưới lịch.
 - **Cài đặt và thống kê:** chuyển tiếng Việt/tiếng Anh, đổi giao diện sáng/tối, khôi phục dữ liệu mẫu và xem thống kê đơn giản.
+- **Gợi ý giờ trống trên Android:** với khung Daily bị trùng, tìm tối đa ba giờ thay thế theo bước 15 phút trong khoảng 05:00–22:00. Người dùng xác nhận trước khi mở form chỉnh sửa; đổi giờ Daily sẽ tác động mọi ngày lặp.
+- **Thông báo lịch hiện tại trên Android:** người dùng bật/tắt trong mục Other. Notification được làm mới khi app đang mở; người dùng có thể gỡ notification và app không tự đăng lại nếu nó không còn được hệ thống hiển thị.
 - **iOS Live Activity:** gửi lịch trong ngày từ JavaScript sang native iOS để hiển thị trên màn hình khóa và Dynamic Island. Live Activity có chế độ Daily và Calendar.
 - **Web:** giao diện React Native Web có thể chạy bằng Expo. Phần native iOS Live Activity không có trên web.
 
@@ -17,8 +19,9 @@ Tài liệu này mô tả **hành vi đang có trong mã nguồn hiện tại**.
 
 - Chưa có backend/API mạng. [schedule.api.ts](./src/api/schedule.api.ts) là lớp giao tiếp nội bộ hiện tại; các hàm đọc/ghi đều dùng Zustand trong bộ nhớ.
 - Chưa có lưu dữ liệu bền vững. Lịch, sự kiện và trạng thái hoàn thành khởi tạo từ dữ liệu mẫu và có thể mất khi app khởi động lại.
-- Chưa có luồng gửi push notification hoặc lập lịch nhắc giờ hoạt động. `expo-notifications` hiện chỉ được dùng để dọn các thông báo đã lập lịch trước đó khi app mở.
-- Android chưa có chức năng tương đương như thông báo thường trực trên màn hình khóa hoặc nhắc lịch.
+- Notification Android không được cập nhật bởi service/alarm nền; nội dung có thể cũ khi app đóng và được cập nhật lại khi mở app.
+- Chưa có luồng gửi push notification hay receiver/alarm Android để tự cập nhật notification khi app đóng, reboot hoặc đổi giờ.
+- Không có đảm bảo notification luôn nằm trên màn hình khóa: người dùng/hệ điều hành có thể gỡ hoặc chặn notification.
 - `ToggleNoteInDailyIntent` và `SelectNoteInDateIntent` được định nghĩa trong plugin nhưng hiện chưa gắn vào giao diện widget. Chưa có luồng tương tác Live Activity ghi ngược dữ liệu vào Zustand.
 
 ## Công nghệ và module
@@ -34,7 +37,7 @@ Tài liệu này mô tả **hành vi đang có trong mã nguồn hiện tại**.
 | date-fns `^4.4.0` | Tính toán ngày/giờ, định dạng ngày và locale `vi`/`en`. |
 | `expo-blur` | Hiệu ứng kính mờ cho thanh tab dưới. |
 | `expo-status-bar`, `react-native-safe-area-context` | Status bar và safe area trên thiết bị. |
-| `expo-notifications` | Hiện chỉ được import động trong hàm dọn notification cũ; không có luồng lập lịch nhắc trong app. |
+| `expo-notifications` | Tạo notification ongoing Android theo yêu cầu người dùng; không có gửi push hoặc cập nhật nền. |
 | React Native Web | Chạy giao diện JavaScript trên trình duyệt. |
 
 ### iOS native
@@ -70,6 +73,11 @@ HomeScreen + Zustand data
   └─ src/services/lockScreenSync.ts
        └─ NativeModules.NoteInLockScreen
             └─ Swift bridge + ActivityKit + WidgetKit (iOS)
+
+Android HomeScreen + Zustand data
+  └─ src/services/androidScheduleNotification.ts
+       └─ expo-notifications
+            └─ Android notification channel + ongoing notification
 ```
 
 [`src/app/index.tsx`](./src/app/index.tsx) là màn hình chính, tự quản lý tab đang chọn và yêu cầu dữ liệu timeline. [`src/app/manage.tsx`](./src/app/manage.tsx) hiện chỉ redirect về `/`. [`App.tsx`](./App.tsx) ở root là template Expo cũ; entry thực tế lấy từ `expo-router/entry`.
@@ -82,10 +90,10 @@ src/
   api/          Lớp thao tác dữ liệu; hiện đọc/ghi Zustand, chưa gọi server
   components/   Các tab và thành phần giao diện
   data/         Dữ liệu mẫu khởi tạo
-  engine/       Logic thuần để tạo timeline, xác định trạng thái và xung đột
+  engine/       Logic thuần để tạo timeline, xác định trạng thái, xung đột và giờ trống
   hooks/        Hook thời gian hiện tại
   i18n/         Chuỗi tiếng Việt/Anh và bản dịch dữ liệu mẫu
-  services/     Tích hợp nền tảng, hiện gồm đồng bộ iOS Live Activity
+  services/     Tích hợp nền tảng: iOS Live Activity và Android notification
   store/        Zustand store dùng chung
   types/        Kiểu dữ liệu lịch và sự kiện
 

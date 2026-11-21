@@ -16,6 +16,7 @@ import { WebDashboardTab, type WebTabId } from './WebDashboardTab';
 import { WebFinanceTab } from './WebFinanceTab';
 import { WebProjectTab } from './WebProjectTab';
 import { WebQuickNoteTab } from './WebQuickNoteTab';
+import { WebReminderTab } from './WebReminderTab';
 import { WebTasksTab } from './WebTasksTab';
 
 interface WebWorkspaceProps {
@@ -218,20 +219,12 @@ export function WebWorkspace({
         )}
 
         {activeTab === 'reminder' && (
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={styles.centeredDesktopTabWrap}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.desktopReminderContainer}>
-              <DailyTab
-                now={now}
-                timeline={timeline}
-                onToggleDone={onToggleDailyDone}
-                onDataChange={onDataChange}
-              />
-            </View>
-          </ScrollView>
+          <WebReminderTab
+            now={now}
+            timeline={timeline}
+            onToggleDone={onToggleDailyDone}
+            onDataChange={onDataChange}
+          />
         )}
 
         {activeTab === 'finance' && <WebFinanceTab now={now} />}

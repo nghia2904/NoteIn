@@ -204,7 +204,13 @@ export function WebDashboardTab({
           <Text style={[styles.kpiLabel, isDark && styles.subTextDark]}>
             {isVi ? 'SỐ DƯ TÀI CHÍNH' : 'NET BALANCE'}
           </Text>
-          <Text style={[styles.kpiValue, styles.kpiValueEmerald]}>
+          <Text
+            style={[
+              styles.kpiValue,
+              { color: netBalance >= 0 ? '#16a34a' : '#ef4444' },
+            ]}
+          >
+            {netBalance > 0 ? '+' : ''}
             {formatCurrency(netBalance)}
           </Text>
           <Text style={styles.kpiSub}>

@@ -1,6 +1,7 @@
 import {
   addDays,
   addMonths,
+  addYears,
   endOfMonth,
   endOfWeek,
   format,
@@ -9,6 +10,7 @@ import {
   startOfMonth,
   startOfWeek,
   subMonths,
+  subYears,
 } from 'date-fns';
 import { enUS, vi } from 'date-fns/locale';
 import React, { useMemo, useState } from 'react';
@@ -27,18 +29,28 @@ import {
   useWebWorkspaceStore,
 } from '../../store/webWorkspaceStore';
 
+const COLOR_INCOME = '#16a34a'; // Xanh lá cho Thu nhập (+)
+const COLOR_EXPENSE = '#ef4444'; // Đỏ cho Chi tiêu (-)
+
 function formatVnd(amount: number): string {
-  return amount.toLocaleString('vi-VN') + ' ₫';
+  return Math.abs(amount).toLocaleString('vi-VN') + ' ₫';
+}
+
+function formatSignedVnd(amount: number): string {
+  if (amount > 0) return `+${formatVnd(amount)}`;
+  if (amount < 0) return `-${formatVnd(amount)}`;
+  return '0 ₫';
 }
 
 function formatCompactVnd(amount: number): string {
-  if (amount >= 1_000_000) {
-    return `${(amount / 1_000_000).toFixed(amount % 1_000_000 === 0 ? 0 : 1)}tr`;
+  const abs = Math.abs(amount);
+  if (abs >= 1_000_000) {
+    return `${(abs / 1_000_000).toFixed(abs % 1_000_000 === 0 ? 0 : 1)}tr`;
   }
-  if (amount >= 1_000) {
-    return `${Math.round(amount / 1_000)}k`;
+  if (abs >= 1_000) {
+    return `${Math.round(abs / 1_000)}k`;
   }
-  return String(amount);
+  return String(abs);
 }
 
 export function WebFinanceTab({ now }: { now: Date }) {
@@ -50,8 +62,10 @@ export function WebFinanceTab({ now }: { now: Date }) {
   const locale = isVi ? vi : enUS;
   const todayStr = format(now, 'yyyy-MM-dd');
 
-  // MoneyNote sub-views: 'overview' (Input + Calendar + Report) or filter by month
-  const [currentMonth, setCurrentMonth] = useState<Date>(() => startOfMonth(now));
+  const [currentPeriodDate, setCurrentPeriodDate] = useState<Date>(() =>
+    startOfMonth(now),
+  );
+  const [periodMode, setPeriodMode] = useState<'month' | 'year'>('month');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [rightSubTab, setRightSubTab] = useState<'calendar' | 'report'>('calendar');
 
@@ -86,21 +100,45 @@ export function WebFinanceTab({ now }: { now: Date }) {
     setNoteInput('');
   };
 
-  // Monthly & daily aggregations
-  const monthKeyPrefix = format(currentMonth, 'yyyy-MM');
+  const handlePrevPeriod = () => {
+    setCurrentPeriodDate((d) =>
+      periodMode === 'month' ? subMonths(d, 1) : subYears(d, 1),
+    );
+  };
+
+  const handleNextPeriod = () => {
+    setCurrentPeriodDate((d) =>
+      periodMode === 'month' ? addMonths(d, 1) : addYears(d, 1),
+    );
+  };
+
+  // Period prefix: 'yyyy-MM' when viewing by month, or 'yyyy' when viewing by year
+  const periodPrefix =
+    periodMode === 'month'
+      ? format(currentPeriodDate, 'yyyy-MM')
+      : format(currentPeriodDate, 'yyyy');
+
+  const periodDisplayLabel =
+    periodMode === 'month'
+      ? format(
+          currentPeriodDate,
+          isVi ? "'Tháng' MM, yyyy" : 'MMMM yyyy',
+          { locale },
+        )
+      : format(currentPeriodDate, isVi ? "'Năm' yyyy" : 'yyyy', { locale });
 
   const {
-    monthIncome,
-    monthExpense,
-    monthBalance,
+    periodIncome,
+    periodExpense,
+    periodBalance,
     dailyTotalsMap,
     expenseByCategory,
     incomeByCategory,
     selectedDateTxs,
-    monthTxs,
+    periodTxs,
   } = useMemo(() => {
-    let mInc = 0;
-    let mExp = 0;
+    let pInc = 0;
+    let pExp = 0;
     const dMap: Record<string, { income: number; expense: number }> = {};
     const expCatTotals: Record<string, number> = {};
     const incCatTotals: Record<string, number> = {};
@@ -115,13 +153,15 @@ export function WebFinanceTab({ now }: { now: Date }) {
         dMap[tx.date].expense += tx.amount;
       }
 
-      if (tx.date.startsWith(monthKeyPrefix)) {
+      if (tx.date.startsWith(periodPrefix)) {
         if (tx.type === 'income') {
-          mInc += tx.amount;
-          incCatTotals[tx.categoryId] = (incCatTotals[tx.categoryId] ?? 0) + tx.amount;
+          pInc += tx.amount;
+          incCatTotals[tx.categoryId] =
+            (incCatTotals[tx.categoryId] ?? 0) + tx.amount;
         } else {
-          mExp += tx.amount;
-          expCatTotals[tx.categoryId] = (expCatTotals[tx.categoryId] ?? 0) + tx.amount;
+          pExp += tx.amount;
+          expCatTotals[tx.categoryId] =
+            (expCatTotals[tx.categoryId] ?? 0) + tx.amount;
         }
       }
     }
@@ -129,7 +169,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
     const expBreakdown = FINANCE_CATEGORIES.filter((c) => c.type === 'expense')
       .map((cat) => {
         const val = expCatTotals[cat.id] ?? 0;
-        const pct = mExp > 0 ? Math.round((val / mExp) * 100) : 0;
+        const pct = pExp > 0 ? Math.round((val / pExp) * 100) : 0;
         return { cat, val, pct };
       })
       .filter((item) => item.val > 0)
@@ -138,33 +178,33 @@ export function WebFinanceTab({ now }: { now: Date }) {
     const incBreakdown = FINANCE_CATEGORIES.filter((c) => c.type === 'income')
       .map((cat) => {
         const val = incCatTotals[cat.id] ?? 0;
-        const pct = mInc > 0 ? Math.round((val / mInc) * 100) : 0;
+        const pct = pInc > 0 ? Math.round((val / pInc) * 100) : 0;
         return { cat, val, pct };
       })
       .filter((item) => item.val > 0)
       .sort((a, b) => b.val - a.val);
 
     const dayList = transactions.filter((tx) => tx.date === selectedDate);
-    const mList = transactions
-      .filter((tx) => tx.date.startsWith(monthKeyPrefix))
+    const pList = transactions
+      .filter((tx) => tx.date.startsWith(periodPrefix))
       .sort((a, b) => b.date.localeCompare(a.date));
 
     return {
-      monthIncome: mInc,
-      monthExpense: mExp,
-      monthBalance: mInc - mExp,
+      periodIncome: pInc,
+      periodExpense: pExp,
+      periodBalance: pInc - pExp,
       dailyTotalsMap: dMap,
       expenseByCategory: expBreakdown,
       incomeByCategory: incBreakdown,
       selectedDateTxs: dayList,
-      monthTxs: mList,
+      periodTxs: pList,
     };
-  }, [transactions, monthKeyPrefix, selectedDate]);
+  }, [transactions, periodPrefix, selectedDate]);
 
-  // Build calendar grid for currentMonth
+  // Build calendar grid for currentPeriodDate's month
   const calendarDays = useMemo(() => {
-    const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
-    const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 });
+    const start = startOfWeek(startOfMonth(currentPeriodDate), { weekStartsOn: 1 });
+    const end = endOfWeek(endOfMonth(currentPeriodDate), { weekStartsOn: 1 });
     const days: Date[] = [];
     let cursor = start;
     while (cursor <= end || days.length < 35) {
@@ -173,11 +213,30 @@ export function WebFinanceTab({ now }: { now: Date }) {
       if (days.length >= 42) break;
     }
     return days;
-  }, [currentMonth]);
+  }, [currentPeriodDate]);
 
   const weekdays = isVi
     ? ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
     : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  // Pie chart percentages (Green = Income, Red = Expense)
+  const totalVolume = periodIncome + periodExpense;
+  const incomePct =
+    totalVolume > 0 ? Math.round((periodIncome / totalVolume) * 100) : 0;
+  const expensePct = totalVolume > 0 ? 100 - incomePct : 0;
+  const incomeDeg =
+    totalVolume > 0 ? Math.round((periodIncome / totalVolume) * 360) : 180;
+
+  const pieGradientStyle =
+    totalVolume > 0
+      ? ({
+          backgroundImage: `conic-gradient(${COLOR_INCOME} 0deg ${incomeDeg}deg, ${COLOR_EXPENSE} ${incomeDeg}deg 360deg)`,
+        } as unknown as object)
+      : ({
+          backgroundColor: '#e5e7eb',
+        } as object);
+
+  const isPositiveBalance = periodBalance >= 0;
 
   return (
     <ScrollView
@@ -185,7 +244,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
-      {/* Top Header with Month Selector & MoneyNote View Toggle */}
+      {/* Top Header with Month/Year Mode Switcher, Period Nav & View Toggle */}
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.subtitleChip}>MONEYNOTE · PERSONAL FINANCE</Text>
@@ -195,36 +254,70 @@ export function WebFinanceTab({ now }: { now: Date }) {
         </View>
 
         <View style={styles.headerControls}>
-          {/* Month Switcher */}
+          {/* Period Mode Toggle: Theo tháng | Theo năm */}
+          <View style={[styles.subTabGroup, isDark && styles.cardDark]}>
+            <Pressable
+              onPress={() => setPeriodMode('month')}
+              style={[
+                styles.subTabBtn,
+                periodMode === 'month' && styles.periodModeBtnActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.subTabText,
+                  periodMode === 'month' && styles.subTabTextActive,
+                ]}
+              >
+                {isVi ? 'Theo tháng' : 'Monthly'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setPeriodMode('year')}
+              style={[
+                styles.subTabBtn,
+                periodMode === 'year' && styles.periodModeBtnActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.subTabText,
+                  periodMode === 'year' && styles.subTabTextActive,
+                ]}
+              >
+                {isVi ? 'Theo năm' : 'Yearly'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Period Stepper (< Tháng 11, 2026 / Năm 2026 >) */}
           <View style={styles.monthNavGroup}>
             <Pressable
-              onPress={() => setCurrentMonth((m) => subMonths(m, 1))}
+              onPress={handlePrevPeriod}
               style={[styles.navIconBtn, isDark && styles.cardDark]}
             >
               <Text style={[styles.navIconText, isDark && styles.textDark]}>‹</Text>
             </Pressable>
             <View style={[styles.monthBadge, isDark && styles.cardDark]}>
               <Text style={[styles.monthBadgeText, isDark && styles.textDark]}>
-                {format(currentMonth, isVi ? "'Tháng' MM, yyyy" : 'MMMM yyyy', {
-                  locale,
-                })}
+                {periodDisplayLabel}
               </Text>
             </View>
             <Pressable
-              onPress={() => setCurrentMonth((m) => addMonths(m, 1))}
+              onPress={handleNextPeriod}
               style={[styles.navIconBtn, isDark && styles.cardDark]}
             >
               <Text style={[styles.navIconText, isDark && styles.textDark]}>›</Text>
             </Pressable>
           </View>
 
-          {/* Sub-view Toggle: Lịch thu chi (Calendar) | Báo cáo (Report) */}
+          {/* Sub-view Toggle: Lịch thu chi (Calendar) | Báo cáo danh mục (Report) */}
           <View style={[styles.subTabGroup, isDark && styles.cardDark]}>
             <Pressable
               onPress={() => setRightSubTab('calendar')}
               style={[
                 styles.subTabBtn,
-                rightSubTab === 'calendar' && styles.subTabBtnActive,
+                rightSubTab === 'calendar' && styles.periodModeBtnActive,
               ]}
             >
               <Text
@@ -240,7 +333,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
               onPress={() => setRightSubTab('report')}
               style={[
                 styles.subTabBtn,
-                rightSubTab === 'report' && styles.subTabBtnActive,
+                rightSubTab === 'report' && styles.periodModeBtnActive,
               ]}
             >
               <Text
@@ -256,49 +349,67 @@ export function WebFinanceTab({ now }: { now: Date }) {
         </View>
       </View>
 
-      {/* 3 Monthly Summary Cards (Thu nhập | Chi tiêu | Tổng cộng) */}
+      {/* 3 Summary Cards: Thu nhập (+) Xanh | Chi tiêu (-) Đỏ | Tổng thu chi (Xanh nếu +, Đỏ nếu -) */}
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, isDark && styles.cardDark]}>
           <Text style={[styles.summaryLabel, isDark && styles.subTextDark]}>
-            {isVi ? 'THU NHẬP TRONG THÁNG' : 'MONTHLY INCOME'}
+            {periodMode === 'month'
+              ? isVi
+                ? 'THU NHẬP TRONG THÁNG (+)'
+                : 'MONTHLY INCOME (+)'
+              : isVi
+                ? 'THU NHẬP TRONG NĂM (+)'
+                : 'YEARLY INCOME (+)'}
           </Text>
-          <Text style={[styles.summaryValue, { color: '#10b981' }]}>
-            +{formatVnd(monthIncome)}
+          <Text style={[styles.summaryValue, { color: COLOR_INCOME }]}>
+            +{formatVnd(periodIncome)}
           </Text>
         </View>
 
         <View style={[styles.summaryCard, isDark && styles.cardDark]}>
           <Text style={[styles.summaryLabel, isDark && styles.subTextDark]}>
-            {isVi ? 'CHI TIÊU TRONG THÁNG' : 'MONTHLY EXPENSE'}
+            {periodMode === 'month'
+              ? isVi
+                ? 'CHI TIÊU TRONG THÁNG (-)'
+                : 'MONTHLY EXPENSE (-)'
+              : isVi
+                ? 'CHI TIÊU TRONG NĂM (-)'
+                : 'YEARLY EXPENSE (-)'}
           </Text>
-          <Text style={[styles.summaryValue, { color: '#f97316' }]}>
-            -{formatVnd(monthExpense)}
+          <Text style={[styles.summaryValue, { color: COLOR_EXPENSE }]}>
+            -{formatVnd(periodExpense)}
           </Text>
         </View>
 
         <View
           style={[
             styles.summaryCard,
-            styles.summaryCardBalance,
+            isPositiveBalance
+              ? styles.summaryCardPositive
+              : styles.summaryCardNegative,
             isDark && styles.cardDark,
           ]}
         >
-          <Text style={[styles.summaryLabel, isDark && styles.subTextDark]}>
-            {isVi ? 'CÂN ĐỐI THÁNG (THU - CHI)' : 'MONTHLY NET TOTAL'}
+          <Text
+            style={[
+              styles.summaryLabel,
+              { color: isPositiveBalance ? COLOR_INCOME : COLOR_EXPENSE },
+            ]}
+          >
+            {isVi ? 'TỔNG THU CHI (THU - CHI)' : 'NET BALANCE'}
           </Text>
           <Text
             style={[
               styles.summaryValue,
-              { color: monthBalance >= 0 ? '#059669' : '#e11d48' },
+              { color: isPositiveBalance ? COLOR_INCOME : COLOR_EXPENSE },
             ]}
           >
-            {monthBalance >= 0 ? '+' : ''}
-            {formatVnd(monthBalance)}
+            {formatSignedVnd(periodBalance)}
           </Text>
         </View>
       </View>
 
-      {/* Main Split: Left MoneyNote Input Form + Right Calendar / Report & Ledger */}
+      {/* Main Split: Left MoneyNote Input Form + Right Calendar / Pie Chart Report */}
       <View style={styles.mainRow}>
         {/* LEFT: MoneyNote Input Panel */}
         <View style={[styles.inputPanel, isDark && styles.cardDark]}>
@@ -316,7 +427,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                   txType === 'expense' && styles.typeSwitchTextActive,
                 ]}
               >
-                {isVi ? '💸 Tiền chi' : '💸 Expense'}
+                {isVi ? '− Tiền chi' : '− Expense'}
               </Text>
             </Pressable>
             <Pressable
@@ -332,7 +443,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                   txType === 'income' && styles.typeSwitchTextActive,
                 ]}
               >
-                {isVi ? '💰 Tiền thu' : '💰 Income'}
+                {isVi ? '+ Tiền thu' : '+ Income'}
               </Text>
             </Pressable>
           </View>
@@ -389,9 +500,13 @@ export function WebFinanceTab({ now }: { now: Date }) {
               placeholder={isVi ? 'VD: 85000' : 'e.g. 85000'}
               placeholderTextColor="#9ca3af"
               keyboardType="numeric"
-              style={[styles.input, styles.amountInput, isDark && styles.inputDark]}
+              style={[
+                styles.input,
+                styles.amountInput,
+                { color: txType === 'expense' ? COLOR_EXPENSE : COLOR_INCOME },
+                isDark && styles.inputDark,
+              ]}
             />
-            {/* Quick Amount Chips */}
             <View style={styles.quickAmountRow}>
               {[35000, 50000, 100000, 200000, 500000].map((amt) => (
                 <Pressable
@@ -428,6 +543,8 @@ export function WebFinanceTab({ now }: { now: Date }) {
           <View style={styles.catGrid}>
             {visibleCategories.map((cat) => {
               const active = cat.id === selectedCatId;
+              const accentColor =
+                txType === 'expense' ? COLOR_EXPENSE : COLOR_INCOME;
               return (
                 <Pressable
                   key={cat.id}
@@ -436,8 +553,12 @@ export function WebFinanceTab({ now }: { now: Date }) {
                     styles.catTile,
                     isDark && styles.rowDark,
                     active && {
-                      borderColor: cat.color,
-                      backgroundColor: isDark ? '#1e293b' : '#fff7ed',
+                      borderColor: accentColor,
+                      backgroundColor: isDark
+                        ? '#1e293b'
+                        : txType === 'expense'
+                          ? '#fef2f2'
+                          : '#f0fdf4',
                     },
                   ]}
                 >
@@ -446,7 +567,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                     style={[
                       styles.catName,
                       isDark && styles.textDark,
-                      active && { color: cat.color, fontWeight: '800' },
+                      active && { color: accentColor, fontWeight: '800' },
                     ]}
                     numberOfLines={1}
                   >
@@ -461,36 +582,38 @@ export function WebFinanceTab({ now }: { now: Date }) {
             onPress={handleAddTx}
             style={[
               styles.submitBtn,
-              { backgroundColor: txType === 'expense' ? '#f97316' : '#10b981' },
+              {
+                backgroundColor:
+                  txType === 'expense' ? COLOR_EXPENSE : COLOR_INCOME,
+              },
             ]}
           >
             <Text style={styles.submitBtnText}>
-              +{' '}
               {txType === 'expense'
                 ? isVi
-                  ? 'Nhập khoản Tiền chi'
-                  : 'Save Expense'
+                  ? '− Lưu khoản Tiền chi'
+                  : '− Save Expense'
                 : isVi
-                  ? 'Nhập khoản Tiền thu'
-                  : 'Save Income'}
+                  ? '+ Lưu khoản Tiền thu'
+                  : '+ Save Income'}
             </Text>
           </Pressable>
         </View>
 
-        {/* RIGHT: MoneyNote Monthly Calendar OR Category Report + Ledger */}
+        {/* RIGHT: MoneyNote Monthly Calendar OR Pie Chart Report + Ledger */}
         <View style={styles.rightCol}>
           {rightSubTab === 'calendar' ? (
             <View style={[styles.reportCard, isDark && styles.cardDark]}>
               <View style={styles.calTopRow}>
                 <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
                   {isVi
-                    ? `Lịch Thu Chi · ${format(currentMonth, "'Tháng' MM/yyyy", { locale })}`
-                    : `Finance Calendar · ${format(currentMonth, 'MMM yyyy', { locale })}`}
+                    ? `Lịch Thu Chi · ${format(currentPeriodDate, "'Tháng' MM/yyyy", { locale })}`
+                    : `Finance Calendar · ${format(currentPeriodDate, 'MMM yyyy', { locale })}`}
                 </Text>
                 <Text style={styles.calHint}>
                   {isVi
-                    ? 'Bấm vào ngày bất kỳ để xem hoặc ghi thu chi ngày đó'
-                    : 'Click any date to view or add transactions'}
+                    ? 'Thu nhập (+) màu xanh · Chi tiêu (-) màu đỏ'
+                    : 'Income (+) in green · Expense (-) in red'}
                 </Text>
               </View>
 
@@ -501,7 +624,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                     <Text
                       style={[
                         styles.weekdayText,
-                        idx === 6 && { color: '#ef4444' },
+                        idx === 6 && { color: COLOR_EXPENSE },
                         isDark && idx !== 6 && styles.subTextDark,
                       ]}
                     >
@@ -515,7 +638,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
               <View style={styles.calGrid}>
                 {calendarDays.map((dayObj) => {
                   const dStr = format(dayObj, 'yyyy-MM-dd');
-                  const inMonth = isSameMonth(dayObj, currentMonth);
+                  const inMonth = isSameMonth(dayObj, currentPeriodDate);
                   const isSelected = dStr === selectedDate;
                   const isToday = dStr === todayStr;
                   const dayStat = dailyTotalsMap[dStr];
@@ -605,7 +728,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                           <Text
                             style={[
                               styles.txAmount,
-                              { color: isExp ? '#f97316' : '#10b981' },
+                              { color: isExp ? COLOR_EXPENSE : COLOR_INCOME },
                             ]}
                           >
                             {isExp ? '-' : '+'}
@@ -625,19 +748,110 @@ export function WebFinanceTab({ now }: { now: Date }) {
               </View>
             </View>
           ) : (
-            /* REPORT TAB: Category Breakdown for Expense & Income */
+            /* REPORT TAB: 2-Color Pie Chart (Green = Income, Red = Expense) + Monthly/Yearly Category Breakdown */
             <View style={[styles.reportCard, isDark && styles.cardDark]}>
+              <View style={styles.reportHeaderRow}>
+                <View>
+                  <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
+                    {isVi
+                      ? `Biểu đồ Thu Chi · ${periodDisplayLabel}`
+                      : `Income vs Expense Pie Chart · ${periodDisplayLabel}`}
+                  </Text>
+                  <Text style={styles.calHint}>
+                    {isVi
+                      ? 'Màu xanh (+): Thu nhập · Màu đỏ (−): Chi tiêu'
+                      : 'Green (+): Income · Red (−): Expense'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 2-Color Pie / Donut Chart Area */}
+              <View style={styles.pieSectionRow}>
+                {/* Circular Pie Chart using conic-gradient (Green Income vs Red Expense) */}
+                <View style={[styles.pieOuterCircle, pieGradientStyle]}>
+                  <View
+                    style={[
+                      styles.pieInnerHole,
+                      isDark && { backgroundColor: '#1e293b' },
+                    ]}
+                  >
+                    <Text style={styles.pieCenterLabel}>
+                      {isVi ? 'CÂN ĐỐI' : 'NET'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.pieCenterValue,
+                        {
+                          color: isPositiveBalance
+                            ? COLOR_INCOME
+                            : COLOR_EXPENSE,
+                        },
+                      ]}
+                    >
+                      {isPositiveBalance ? '+' : '-'}
+                      {formatCompactVnd(periodBalance)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Pie Chart Legend (Green = Thu nhập +, Red = Chi tiêu -) */}
+                <View style={styles.pieLegendCol}>
+                  <View style={[styles.legendCard, styles.legendCardIncome, isDark && styles.rowDark]}>
+                    <View style={styles.legendTitleRow}>
+                      <View
+                        style={[
+                          styles.legendDot,
+                          { backgroundColor: COLOR_INCOME },
+                        ]}
+                      />
+                      <Text style={[styles.legendLabel, isDark && styles.textDark]}>
+                        {isVi ? 'Thu nhập (+)' : 'Income (+)'}
+                      </Text>
+                      <Text style={[styles.legendPct, { color: COLOR_INCOME }]}>
+                        {incomePct}%
+                      </Text>
+                    </View>
+                    <Text style={[styles.legendAmount, { color: COLOR_INCOME }]}>
+                      +{formatVnd(periodIncome)}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.legendCard, styles.legendCardExpense, isDark && styles.rowDark]}>
+                    <View style={styles.legendTitleRow}>
+                      <View
+                        style={[
+                          styles.legendDot,
+                          { backgroundColor: COLOR_EXPENSE },
+                        ]}
+                      />
+                      <Text style={[styles.legendLabel, isDark && styles.textDark]}>
+                        {isVi ? 'Chi tiêu (−)' : 'Expense (−)'}
+                      </Text>
+                      <Text style={[styles.legendPct, { color: COLOR_EXPENSE }]}>
+                        {expensePct}%
+                      </Text>
+                    </View>
+                    <Text style={[styles.legendAmount, { color: COLOR_EXPENSE }]}>
+                      -{formatVnd(periodExpense)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* Category Details: Expense Categories (Red) & Income Categories (Green) */}
               <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
                 {isVi
-                  ? 'Báo cáo Chi tiêu theo danh mục'
-                  : 'Expense Breakdown by Category'}
+                  ? 'Chi tiết Chi tiêu theo danh mục (−)'
+                  : 'Expense Breakdown by Category (−)'}
               </Text>
 
               {expenseByCategory.length === 0 ? (
                 <Text style={[styles.emptyHint, isDark && styles.subTextDark]}>
                   {isVi
-                    ? 'Tháng này chưa có khoản chi tiêu nào.'
-                    : 'No expenses recorded this month.'}
+                    ? 'Chưa có khoản chi tiêu nào trong kỳ này.'
+                    : 'No expenses recorded in this period.'}
                 </Text>
               ) : (
                 <View style={styles.breakdownList}>
@@ -650,16 +864,16 @@ export function WebFinanceTab({ now }: { now: Date }) {
                           {cat.icon} {isVi ? cat.nameVi : cat.nameEn}
                         </Text>
                         <Text
-                          style={[styles.breakdownAmount, isDark && styles.textDark]}
+                          style={[styles.breakdownAmount, { color: COLOR_EXPENSE }]}
                         >
-                          {formatVnd(val)} ({pct}%)
+                          -{formatVnd(val)} ({pct}%)
                         </Text>
                       </View>
                       <View style={styles.barTrack}>
                         <View
                           style={[
                             styles.barFill,
-                            { width: `${pct}%`, backgroundColor: cat.color },
+                            { width: `${pct}%`, backgroundColor: COLOR_EXPENSE },
                           ]}
                         />
                       </View>
@@ -672,14 +886,14 @@ export function WebFinanceTab({ now }: { now: Date }) {
 
               <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
                 {isVi
-                  ? 'Báo cáo Thu nhập theo danh mục'
-                  : 'Income Breakdown by Category'}
+                  ? 'Chi tiết Thu nhập theo danh mục (+)'
+                  : 'Income Breakdown by Category (+)'}
               </Text>
               {incomeByCategory.length === 0 ? (
                 <Text style={[styles.emptyHint, isDark && styles.subTextDark]}>
                   {isVi
-                    ? 'Tháng này chưa có khoản thu nhập nào.'
-                    : 'No income recorded this month.'}
+                    ? 'Chưa có khoản thu nhập nào trong kỳ này.'
+                    : 'No income recorded in this period.'}
                 </Text>
               ) : (
                 <View style={styles.breakdownList}>
@@ -692,7 +906,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                           {cat.icon} {isVi ? cat.nameVi : cat.nameEn}
                         </Text>
                         <Text
-                          style={[styles.breakdownAmount, isDark && styles.textDark]}
+                          style={[styles.breakdownAmount, { color: COLOR_INCOME }]}
                         >
                           +{formatVnd(val)} ({pct}%)
                         </Text>
@@ -701,7 +915,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                         <View
                           style={[
                             styles.barFill,
-                            { width: `${pct}%`, backgroundColor: cat.color },
+                            { width: `${pct}%`, backgroundColor: COLOR_INCOME },
                           ]}
                         />
                       </View>
@@ -712,16 +926,16 @@ export function WebFinanceTab({ now }: { now: Date }) {
             </View>
           )}
 
-          {/* Monthly All Transactions List */}
+          {/* Period All Transactions List */}
           <View style={[styles.reportCard, isDark && styles.cardDark]}>
             <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
               {isVi
-                ? `Toàn bộ giao dịch trong tháng (${monthTxs.length})`
-                : `All Monthly Transactions (${monthTxs.length})`}
+                ? `Danh sách giao dịch · ${periodDisplayLabel} (${periodTxs.length})`
+                : `Transactions · ${periodDisplayLabel} (${periodTxs.length})`}
             </Text>
 
             <View style={styles.txList}>
-              {monthTxs.map((tx) => {
+              {periodTxs.map((tx) => {
                 const cat =
                   FINANCE_CATEGORIES.find((c) => c.id === tx.categoryId) ??
                   FINANCE_CATEGORIES[0];
@@ -742,7 +956,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                     <Text
                       style={[
                         styles.txAmount,
-                        { color: isExp ? '#f97316' : '#10b981' },
+                        { color: isExp ? COLOR_EXPENSE : COLOR_INCOME },
                       ]}
                     >
                       {isExp ? '-' : '+'}
@@ -785,7 +999,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
-    color: '#f97316',
+    color: '#16a34a',
     marginBottom: 3,
   },
   pageTitle: {
@@ -798,7 +1012,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
   monthNavGroup: {
     flexDirection: 'row',
@@ -843,12 +1057,12 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   subTabBtn: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 13,
     paddingVertical: 6,
     borderRadius: 99,
   },
-  subTabBtnActive: {
-    backgroundColor: '#f97316',
+  periodModeBtnActive: {
+    backgroundColor: '#18181b',
   },
   subTabText: {
     fontSize: 12,
@@ -873,9 +1087,13 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     gap: 6,
   },
-  summaryCardBalance: {
+  summaryCardPositive: {
     backgroundColor: '#f0fdf4',
     borderColor: '#bbf7d0',
+  },
+  summaryCardNegative: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
   },
   summaryLabel: {
     fontSize: 11,
@@ -922,14 +1140,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typeSwitchExpenseActive: {
-    backgroundColor: '#f97316',
+    backgroundColor: COLOR_EXPENSE,
   },
   typeSwitchIncomeActive: {
-    backgroundColor: '#10b981',
+    backgroundColor: COLOR_INCOME,
   },
   typeSwitchText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#6b7280',
   },
   typeSwitchTextActive: {
@@ -979,7 +1197,7 @@ const styles = StyleSheet.create({
   },
   amountInput: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   quickAmountRow: {
     flexDirection: 'row',
@@ -1058,6 +1276,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  reportHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '800',
@@ -1098,8 +1321,8 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   calCellSelected: {
-    backgroundColor: '#fff7ed',
-    borderColor: '#f97316',
+    backgroundColor: '#fef2f2',
+    borderColor: COLOR_EXPENSE,
     borderWidth: 1.5,
   },
   calCellHeader: {
@@ -1125,12 +1348,12 @@ const styles = StyleSheet.create({
   calIncText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#10b981',
+    color: COLOR_INCOME,
   },
   calExpText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#f97316',
+    color: COLOR_EXPENSE,
   },
   selectedDaySection: {
     borderTopWidth: 1,
@@ -1142,6 +1365,86 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#111827',
+  },
+  // Pie Chart Styles
+  pieSectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 28,
+    paddingVertical: 10,
+  },
+  pieOuterCircle: {
+    width: 190,
+    height: 190,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pieInnerHole: {
+    width: 116,
+    height: 116,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  pieCenterLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#6b7280',
+    letterSpacing: 0.6,
+  },
+  pieCenterValue: {
+    fontSize: 15,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  pieLegendCol: {
+    flex: 1,
+    minWidth: 220,
+    gap: 12,
+  },
+  legendCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 4,
+  },
+  legendCardIncome: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  legendCardExpense: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  legendTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 99,
+  },
+  legendLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  legendPct: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  legendAmount: {
+    fontSize: 18,
+    fontWeight: '900',
+    paddingLeft: 20,
   },
   emptyHint: {
     fontSize: 13,
@@ -1171,7 +1474,6 @@ const styles = StyleSheet.create({
   breakdownAmount: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#111827',
   },
   barTrack: {
     height: 7,

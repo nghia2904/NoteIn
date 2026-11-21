@@ -136,6 +136,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
     incomeByCategory,
     selectedDateTxs,
     periodTxs,
+    txGroupsByDate,
   } = useMemo(() => {
     let pInc = 0;
     let pExp = 0;
@@ -189,6 +190,33 @@ export function WebFinanceTab({ now }: { now: Date }) {
       .filter((tx) => tx.date.startsWith(periodPrefix))
       .sort((a, b) => b.date.localeCompare(a.date));
 
+    // Group transactions by date (newest date first) for daily partitioned sections
+    const dateGroupsMap = new Map<
+      string,
+      {
+        date: string;
+        income: number;
+        expense: number;
+        items: typeof pList;
+      }
+    >();
+    for (const tx of pList) {
+      let grp = dateGroupsMap.get(tx.date);
+      if (!grp) {
+        grp = { date: tx.date, income: 0, expense: 0, items: [] };
+        dateGroupsMap.set(tx.date, grp);
+      }
+      if (tx.type === 'income') {
+        grp.income += tx.amount;
+      } else {
+        grp.expense += tx.amount;
+      }
+      grp.items.push(tx);
+    }
+    const txGroupsByDate = Array.from(dateGroupsMap.values()).sort((a, b) =>
+      b.date.localeCompare(a.date),
+    );
+
     return {
       periodIncome: pInc,
       periodExpense: pExp,
@@ -198,6 +226,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
       incomeByCategory: incBreakdown,
       selectedDateTxs: dayList,
       periodTxs: pList,
+      txGroupsByDate,
     };
   }, [transactions, periodPrefix, selectedDate]);
 
@@ -926,52 +955,161 @@ export function WebFinanceTab({ now }: { now: Date }) {
             </View>
           )}
 
-          {/* Period All Transactions List */}
+          {/* Period Transactions Partitioned by Date (Phân khu theo từng ngày) */}
           <View style={[styles.reportCard, isDark && styles.cardDark]}>
             <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
               {isVi
-                ? `Danh sách giao dịch · ${periodDisplayLabel} (${periodTxs.length})`
-                : `Transactions · ${periodDisplayLabel} (${periodTxs.length})`}
+                ? `Danh sách giao dịch theo ngày · ${periodDisplayLabel} (${periodTxs.length})`
+                : `Daily Grouped Transactions · ${periodDisplayLabel} (${periodTxs.length})`}
             </Text>
 
-            <View style={styles.txList}>
-              {periodTxs.map((tx) => {
-                const cat =
-                  FINANCE_CATEGORIES.find((c) => c.id === tx.categoryId) ??
-                  FINANCE_CATEGORIES[0];
-                const isExp = tx.type === 'expense';
-                return (
-                  <View key={tx.id} style={[styles.txRow, isDark && styles.rowDark]}>
-                    <View style={styles.txIconBox}>
-                      <Text style={{ fontSize: 18 }}>{cat.icon}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.txTitle, isDark && styles.textDark]}>
-                        {tx.note || (isVi ? cat.nameVi : cat.nameEn)}
-                      </Text>
-                      <Text style={styles.txSub}>
-                        {isVi ? cat.nameVi : cat.nameEn} · {tx.date}
-                      </Text>
-                    </View>
-                    <Text
+            {txGroupsByDate.length === 0 ? (
+              <Text style={[styles.emptyHint, isDark && styles.subTextDark]}>
+                {isVi
+                  ? 'Chưa có giao dịch nào trong kỳ này.'
+                  : 'No transactions in this period.'}
+              </Text>
+            ) : (
+              <View style={styles.dateGroupsList}>
+                {txGroupsByDate.map((group) => {
+                  const dayNet = group.income - group.expense;
+                  let dateHeaderLabel = group.date;
+                  try {
+                    dateHeaderLabel = format(
+                      parseISO(group.date),
+                      isVi ? 'EEEE, dd/MM/yyyy' : 'EEEE, MMM dd, yyyy',
+                      { locale },
+                    );
+                  } catch {
+                    dateHeaderLabel = group.date;
+                  }
+
+                  return (
+                    <View
+                      key={group.date}
                       style={[
-                        styles.txAmount,
-                        { color: isExp ? COLOR_EXPENSE : COLOR_INCOME },
+                        styles.datePartitionCard,
+                        isDark && styles.datePartitionCardDark,
                       ]}
                     >
-                      {isExp ? '-' : '+'}
-                      {formatVnd(tx.amount)}
-                    </Text>
-                    <Pressable
-                      onPress={() => deleteTransaction(tx.id)}
-                      style={styles.txDeleteBtn}
-                    >
-                      <Text style={styles.txDeleteText}>✕</Text>
-                    </Pressable>
-                  </View>
-                );
-              })}
-            </View>
+                      {/* Date Section Header Bar */}
+                      <Pressable
+                        onPress={() => setSelectedDate(group.date)}
+                        style={[
+                          styles.datePartitionHeader,
+                          isDark && styles.datePartitionHeaderDark,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.datePartitionTitle,
+                            isDark && styles.textDark,
+                          ]}
+                        >
+                          📅 {dateHeaderLabel}
+                        </Text>
+
+                        <View style={styles.datePartitionTotalsRow}>
+                          {group.income > 0 && (
+                            <Text
+                              style={[
+                                styles.datePartitionSubAmount,
+                                { color: COLOR_INCOME },
+                              ]}
+                            >
+                              +{formatVnd(group.income)}
+                            </Text>
+                          )}
+                          {group.expense > 0 && (
+                            <Text
+                              style={[
+                                styles.datePartitionSubAmount,
+                                { color: COLOR_EXPENSE },
+                              ]}
+                            >
+                              -{formatVnd(group.expense)}
+                            </Text>
+                          )}
+                          <View
+                            style={[
+                              styles.dateNetBadge,
+                              dayNet >= 0
+                                ? styles.dateNetBadgePos
+                                : styles.dateNetBadgeNeg,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.dateNetBadgeText,
+                                {
+                                  color:
+                                    dayNet >= 0 ? COLOR_INCOME : COLOR_EXPENSE,
+                                },
+                              ]}
+                            >
+                              {formatSignedVnd(dayNet)}
+                            </Text>
+                          </View>
+                        </View>
+                      </Pressable>
+
+                      {/* Transactions inside this Date Section */}
+                      <View style={styles.datePartitionBody}>
+                        {group.items.map((tx) => {
+                          const cat =
+                            FINANCE_CATEGORIES.find(
+                              (c) => c.id === tx.categoryId,
+                            ) ?? FINANCE_CATEGORIES[0];
+                          const isExp = tx.type === 'expense';
+                          return (
+                            <View
+                              key={tx.id}
+                              style={[styles.txRow, isDark && styles.rowDark]}
+                            >
+                              <View style={styles.txIconBox}>
+                                <Text style={{ fontSize: 18 }}>{cat.icon}</Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text
+                                  style={[
+                                    styles.txTitle,
+                                    isDark && styles.textDark,
+                                  ]}
+                                >
+                                  {tx.note || (isVi ? cat.nameVi : cat.nameEn)}
+                                </Text>
+                                <Text style={styles.txSub}>
+                                  {isVi ? cat.nameVi : cat.nameEn}
+                                </Text>
+                              </View>
+                              <Text
+                                style={[
+                                  styles.txAmount,
+                                  {
+                                    color: isExp
+                                      ? COLOR_EXPENSE
+                                      : COLOR_INCOME,
+                                  },
+                                ]}
+                              >
+                                {isExp ? '-' : '+'}
+                                {formatVnd(tx.amount)}
+                              </Text>
+                              <Pressable
+                                onPress={() => deleteTransaction(tx.id)}
+                                style={styles.txDeleteBtn}
+                              >
+                                <Text style={styles.txDeleteText}>✕</Text>
+                              </Pressable>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -1534,6 +1672,73 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9ca3af',
     fontWeight: '700',
+  },
+  dateGroupsList: {
+    gap: 14,
+  },
+  datePartitionCard: {
+    backgroundColor: '#fbfaf7',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e4de',
+    overflow: 'hidden',
+  },
+  datePartitionCardDark: {
+    backgroundColor: '#0f172a',
+    borderColor: '#334155',
+  },
+  datePartitionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: '#f3f2ed',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e4de',
+  },
+  datePartitionHeaderDark: {
+    backgroundColor: '#1e293b',
+    borderBottomColor: '#334155',
+  },
+  datePartitionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#111827',
+    textTransform: 'capitalize',
+  },
+  datePartitionTotalsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  datePartitionSubAmount: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  dateNetBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 99,
+    borderWidth: 1,
+  },
+  dateNetBadgePos: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  dateNetBadgeNeg: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  dateNetBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  datePartitionBody: {
+    padding: 10,
+    gap: 8,
   },
   textDark: {
     color: '#f8fafc',

@@ -171,11 +171,11 @@ export function WebReminderTab({
       <View style={styles.topHeader}>
         <View>
           <Text style={styles.dateChip}>
-            {format(
+            {`${format(
               now,
-              isVi ? "EEEE, dd 'Tháng' MM · LỊCH DAILY 24H" : 'EEEE, MMM dd · 24H DAILY ROUTINE',
+              isVi ? "EEEE, dd 'Tháng' MM" : 'EEEE, MMM dd',
               { locale },
-            ).toUpperCase()}
+            )} · ${isVi ? 'LỊCH DAILY 24H' : '24H DAILY ROUTINE'}`.toUpperCase()}
           </Text>
           <Text style={[styles.pageTitle, isDark && styles.textDark]}>
             {isVi ? 'Reminder · Lịch trình hằng ngày' : 'Reminder · Daily Routine'}

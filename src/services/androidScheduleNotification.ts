@@ -1,10 +1,11 @@
 import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
 import { format } from 'date-fns';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import { buildTimeline, getCurrentState } from '../engine/schedule';
 import { type Language, translations } from '../i18n/translations';
 import type { DailyTemplate, EventItem } from '../types/schedule';
+import { buildLockScreenPayload } from './lockScreenSync';
 
 const NOTIFICATION_ID = 'notein.android.current-schedule';
 const CHANNEL_ID = 'notein-current-schedule';
@@ -60,6 +61,25 @@ async function postCurrentSchedule(
   now: Date,
   language: Language,
 ): Promise<void> {
+  if (NativeModules.NoteInLockScreen?.startOrUpdateLiveActivity) {
+    try {
+      await Notifications.dismissNotificationAsync(NOTIFICATION_ID).catch(() => {});
+    } catch {
+      // Ignore
+    }
+    const payload = buildLockScreenPayload(
+      dailies,
+      events,
+      completions,
+      now,
+      language,
+    );
+    await NativeModules.NoteInLockScreen.startOrUpdateLiveActivity(
+      JSON.stringify(payload),
+    );
+    return;
+  }
+
   await ensureNotificationChannel(language);
   const t = translations[language];
   const timeline = buildTimeline(
@@ -104,6 +124,16 @@ async function postCurrentSchedule(
 
 export async function isAndroidScheduleNotificationActive(): Promise<boolean> {
   if (Platform.OS !== 'android') return false;
+  if (NativeModules.NoteInLockScreen?.isLiveActivityActive) {
+    const active = Boolean(
+      await NativeModules.NoteInLockScreen.isLiveActivityActive(),
+    );
+    if (active) {
+      notificationPosted = true;
+      notificationObserved = true;
+    }
+    return active;
+  }
   const presented = await Notifications.getPresentedNotificationsAsync();
   const active = presented.some(
     (notification) => notification.request.identifier === NOTIFICATION_ID,
@@ -141,8 +171,13 @@ export async function enableAndroidScheduleNotification(
 export async function disableAndroidScheduleNotification(): Promise<void> {
   if (Platform.OS !== 'android') return;
 
-  if (await isAndroidScheduleNotificationActive()) {
+  if (NativeModules.NoteInLockScreen?.stopLiveActivity) {
+    await NativeModules.NoteInLockScreen.stopLiveActivity();
+  }
+  try {
     await Notifications.dismissNotificationAsync(NOTIFICATION_ID);
+  } catch {
+    // Ignore
   }
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   if (scheduled.some((notification) => notification.identifier === NOTIFICATION_ID)) {

@@ -54,15 +54,15 @@ export async function clearAllNotifications(): Promise<void> {
 }
 
 /**
- * Builds the live payload and pushes it to the 2-Card Interactive iOS Lock Screen Live Activity.
+ * Builds the Lock Screen Widget payload shared by iOS Live Activity and Android Custom Lock Screen Widget.
  */
-export async function syncLiveActivityToOSLockScreen(
+export function buildLockScreenPayload(
   dailies: DailyTemplate[],
   events: EventItem[],
   completions: Record<string, true>,
   now: Date,
   language: Language,
-): Promise<boolean> {
+): LockScreenPayload {
   const t = translations[language];
   const dateKey = format(now, 'yyyy-MM-dd');
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -129,7 +129,7 @@ export async function syncLiveActivityToOSLockScreen(
       };
     });
 
-  const payload: LockScreenPayload = {
+  return {
     language,
     selectedDate: dateKey,
     tabDailyLabel: t.lsTabDaily,
@@ -149,9 +149,27 @@ export async function syncLiveActivityToOSLockScreen(
     calendarDaysRaw,
     calendarEvents: todayEvents,
   };
+}
 
+/**
+ * Builds the live payload and pushes it to the iOS Lock Screen Live Activity.
+ */
+export async function syncLiveActivityToOSLockScreen(
+  dailies: DailyTemplate[],
+  events: EventItem[],
+  completions: Record<string, true>,
+  now: Date,
+  language: Language,
+): Promise<boolean> {
   if (Platform.OS === 'ios' && NativeModules.NoteInLockScreen) {
     try {
+      const payload = buildLockScreenPayload(
+        dailies,
+        events,
+        completions,
+        now,
+        language,
+      );
       await NativeModules.NoteInLockScreen.startOrUpdateLiveActivity(
         JSON.stringify(payload),
       );

@@ -540,6 +540,893 @@ const WIDGET_INFO_PLIST = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
+// ============================================================================
+// ANDROID LOCK SCREEN CUSTOM INTERACTIVE WIDGET (RemoteViews + BroadcastReceiver)
+// ============================================================================
+
+const ANDROID_DRAWABLES = {
+  'notein_widget_bg.xml': `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#EA111827" />
+  <corners android:radius="14dp" />
+  <stroke android:width="1dp" android:color="#38FFFFFF" />
+</shape>
+`,
+  'notein_tab_daily_active.xml': `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#F59E0B" />
+  <corners android:radius="99dp" />
+</shape>
+`,
+  'notein_tab_calendar_active.xml': `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#10B981" />
+  <corners android:radius="99dp" />
+</shape>
+`,
+  'notein_tab_inactive.xml': `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#2EFFFFFF" />
+  <corners android:radius="99dp" />
+</shape>
+`,
+  'notein_inner_card_daily.xml': `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#24FFFFFF" />
+  <corners android:radius="11dp" />
+  <stroke android:width="1dp" android:color="#B3F59E0B" />
+</shape>
+`,
+  'notein_inner_card_calendar.xml': `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#24FFFFFF" />
+  <corners android:radius="10dp" />
+  <stroke android:width="1dp" android:color="#8010B981" />
+</shape>
+`,
+  'notein_badge_amber.xml': `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#F59E0B" />
+  <corners android:radius="99dp" />
+</shape>
+`,
+  'notein_badge_emerald.xml': `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+  <solid android:color="#3810B981" />
+  <corners android:radius="6dp" />
+</shape>
+`,
+  'notein_progress_bar.xml': `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:id="@android:id/background">
+    <shape android:shape="rectangle">
+      <corners android:radius="99dp" />
+      <solid android:color="#33FFFFFF" />
+    </shape>
+  </item>
+  <item android:id="@android:id/progress">
+    <scale android:scaleWidth="100%">
+      <shape android:shape="rectangle">
+        <corners android:radius="99dp" />
+        <solid android:color="#F59E0B" />
+      </shape>
+    </scale>
+  </item>
+</layer-list>
+`,
+};
+
+const ANDROID_LAYOUT_COLLAPSED = `<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_root"
+  android:layout_width="match_parent"
+  android:layout_height="48dp"
+  android:orientation="vertical"
+  android:gravity="center_vertical"
+  android:paddingHorizontal="8dp"
+  android:paddingVertical="2dp"
+  android:background="@drawable/notein_widget_bg">
+
+  <!-- Row 1 (18dp): 2 Interactive Tabs (Lịch Daily | Lịch Bàn) -->
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="18dp"
+    android:orientation="horizontal"
+    android:layout_marginBottom="2dp">
+
+    <TextView
+      android:id="@+id/btn_tab_daily"
+      android:layout_width="0dp"
+      android:layout_height="match_parent"
+      android:layout_weight="1"
+      android:gravity="center"
+      android:text="🕒 Lịch Daily"
+      android:textSize="9sp"
+      android:textStyle="bold"
+      android:textColor="#000000"
+      android:background="@drawable/notein_tab_daily_active"
+      android:layout_marginEnd="3dp" />
+
+    <TextView
+      android:id="@+id/btn_tab_calendar"
+      android:layout_width="0dp"
+      android:layout_height="match_parent"
+      android:layout_weight="1"
+      android:gravity="center"
+      android:text="📅 Lịch Bàn"
+      android:textSize="9sp"
+      android:textStyle="bold"
+      android:textColor="#FFFFFF"
+      android:background="@drawable/notein_tab_inactive"
+      android:layout_marginStart="3dp" />
+  </LinearLayout>
+
+  <!-- Row 2 (24dp): Daily Mode Compact Bar -->
+  <LinearLayout
+    android:id="@+id/daily_container"
+    android:layout_width="match_parent"
+    android:layout_height="24dp"
+    android:orientation="vertical"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="6dp"
+    android:background="@drawable/notein_inner_card_daily">
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:id="@+id/txt_current_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="18:00 - 21:00"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:textColor="#FDE047"
+        android:layout_marginEnd="5dp" />
+
+      <TextView
+        android:id="@+id/txt_current_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Ăn tối &amp; Thư giãn"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
+      <TextView
+        android:id="@+id/txt_progress_pct"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="80%"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:textColor="#F59E0B"
+        android:layout_marginStart="5dp" />
+
+      <TextView
+        android:id="@+id/txt_current_badge"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+      <TextView
+        android:id="@+id/txt_current_note"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+      <TextView
+        android:id="@+id/txt_progress_label"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+    </LinearLayout>
+
+    <ProgressBar
+      android:id="@+id/progress_bar"
+      style="?android:attr/progressBarStyleHorizontal"
+      android:layout_width="match_parent"
+      android:layout_height="3dp"
+      android:layout_marginTop="2dp"
+      android:max="100"
+      android:progress="80"
+      android:progressDrawable="@drawable/notein_progress_bar" />
+  </LinearLayout>
+
+  <!-- Row 2 (24dp): Calendar Mode Compact Bar (Today's events only) -->
+  <LinearLayout
+    android:id="@+id/calendar_container"
+    android:layout_width="match_parent"
+    android:layout_height="24dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="6dp"
+    android:background="@drawable/notein_inner_card_calendar"
+    android:visibility="gone">
+
+    <TextView
+      android:id="@+id/txt_empty_events"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:gravity="center"
+      android:text="Chưa có sự kiện nào hôm nay"
+      android:textSize="9sp"
+      android:textColor="#CCFFFFFF"
+      android:singleLine="true"
+      android:visibility="gone" />
+
+    <LinearLayout
+      android:id="@+id/event_row_1"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:orientation="horizontal"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:id="@+id/txt_event_1_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="15:00"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:textColor="#6EE7B7"
+        android:layout_marginEnd="3dp" />
+
+      <TextView
+        android:id="@+id/txt_event_1_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Sự kiện 1"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
+      <TextView
+        android:id="@+id/txt_event_1_note"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+      android:id="@+id/event_row_2"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:orientation="horizontal"
+      android:gravity="center_vertical"
+      android:layout_marginStart="6dp">
+
+      <TextView
+        android:id="@+id/txt_event_2_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="20:00"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:textColor="#6EE7B7"
+        android:layout_marginEnd="3dp" />
+
+      <TextView
+        android:id="@+id/txt_event_2_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Sự kiện 2"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:singleLine="true"
+        android:ellipsize="end" />
+
+      <TextView
+        android:id="@+id/txt_event_2_note"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+    </LinearLayout>
+  </LinearLayout>
+</LinearLayout>
+`;
+
+const ANDROID_LAYOUT_EXPANDED = `<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/widget_root"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+  android:orientation="vertical"
+  android:paddingHorizontal="12dp"
+  android:paddingVertical="8dp"
+  android:background="@drawable/notein_widget_bg">
+
+  <!-- Top Row: 2 Interactive Tabs (Lịch Daily | Lịch Bàn) -->
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginBottom="7dp">
+
+    <TextView
+      android:id="@+id/btn_tab_daily"
+      android:layout_width="0dp"
+      android:layout_height="28dp"
+      android:layout_weight="1"
+      android:gravity="center"
+      android:text="🕒 Lịch Daily"
+      android:textSize="11sp"
+      android:textStyle="bold"
+      android:textColor="#000000"
+      android:background="@drawable/notein_tab_daily_active"
+      android:layout_marginEnd="4dp" />
+
+    <TextView
+      android:id="@+id/btn_tab_calendar"
+      android:layout_width="0dp"
+      android:layout_height="28dp"
+      android:layout_weight="1"
+      android:gravity="center"
+      android:text="📅 Lịch Bàn"
+      android:textSize="11sp"
+      android:textStyle="bold"
+      android:textColor="#FFFFFF"
+      android:background="@drawable/notein_tab_inactive"
+      android:layout_marginStart="4dp" />
+  </LinearLayout>
+
+  <!-- Daily Mode Full Highlight Card -->
+  <LinearLayout
+    android:id="@+id/daily_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:background="@drawable/notein_inner_card_daily">
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical">
+
+      <TextView
+        android:id="@+id/txt_current_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp"
+        android:text="⚡ ĐANG DIỄN RA"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:textColor="#000000"
+        android:background="@drawable/notein_badge_amber" />
+
+      <TextView
+        android:id="@+id/txt_current_time"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="end"
+        android:text="06:00 - 07:30"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:textColor="#FDE047" />
+    </LinearLayout>
+
+    <TextView
+      android:id="@+id/txt_current_title"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="4dp"
+      android:text="Học bài &amp; Ôn ngoại ngữ"
+      android:textSize="14sp"
+      android:textStyle="bold"
+      android:textColor="#FFFFFF"
+      android:singleLine="true"
+      android:ellipsize="end" />
+
+    <TextView
+      android:id="@+id/txt_current_note"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="2dp"
+      android:text="Học 30 từ vựng mới, làm đề luyện nghe"
+      android:textSize="10sp"
+      android:textColor="#CCFFFFFF"
+      android:singleLine="true"
+      android:ellipsize="end" />
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical"
+      android:layout_marginTop="6dp">
+
+      <TextView
+        android:id="@+id/txt_progress_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tiến độ khung giờ"
+        android:textSize="9sp"
+        android:textColor="#B3FFFFFF"
+        android:layout_marginEnd="6dp" />
+
+      <ProgressBar
+        android:id="@+id/progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="0dp"
+        android:layout_height="5dp"
+        android:layout_weight="1"
+        android:max="100"
+        android:progress="50"
+        android:progressDrawable="@drawable/notein_progress_bar" />
+
+      <TextView
+        android:id="@+id/txt_progress_pct"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="50%"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:textColor="#F59E0B"
+        android:layout_marginStart="6dp" />
+    </LinearLayout>
+  </LinearLayout>
+
+  <!-- Calendar Mode Full Container (Today's events only) -->
+  <LinearLayout
+    android:id="@+id/calendar_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <TextView
+      android:id="@+id/txt_empty_events"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:gravity="center"
+      android:paddingVertical="14dp"
+      android:text="Chưa có sự kiện nào trong ngày này."
+      android:textSize="12sp"
+      android:textColor="#CCFFFFFF"
+      android:background="@drawable/notein_inner_card_calendar"
+      android:visibility="gone" />
+
+    <LinearLayout
+      android:id="@+id/event_row_1"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical"
+      android:paddingHorizontal="9dp"
+      android:paddingVertical="6dp"
+      android:background="@drawable/notein_inner_card_calendar">
+
+      <TextView
+        android:id="@+id/txt_event_1_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="4dp"
+        android:text="15:00"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:textColor="#6EE7B7"
+        android:background="@drawable/notein_badge_emerald"
+        android:layout_marginEnd="8dp" />
+
+      <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+          android:id="@+id/txt_event_1_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="Sự kiện 1"
+          android:textSize="12sp"
+          android:textStyle="bold"
+          android:textColor="#FFFFFF"
+          android:singleLine="true"
+          android:ellipsize="end" />
+
+        <TextView
+          android:id="@+id/txt_event_1_note"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="Ghi chú sự kiện 1"
+          android:textSize="10sp"
+          android:textColor="#CCFFFFFF"
+          android:singleLine="true"
+          android:ellipsize="end" />
+      </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+      android:id="@+id/event_row_2"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="horizontal"
+      android:gravity="center_vertical"
+      android:paddingHorizontal="9dp"
+      android:paddingVertical="6dp"
+      android:layout_marginTop="5dp"
+      android:background="@drawable/notein_inner_card_calendar">
+
+      <TextView
+        android:id="@+id/txt_event_2_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="4dp"
+        android:text="20:00"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:textColor="#6EE7B7"
+        android:background="@drawable/notein_badge_emerald"
+        android:layout_marginEnd="8dp" />
+
+      <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+          android:id="@+id/txt_event_2_title"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="Sự kiện 2"
+          android:textSize="12sp"
+          android:textStyle="bold"
+          android:textColor="#FFFFFF"
+          android:singleLine="true"
+          android:ellipsize="end" />
+
+        <TextView
+          android:id="@+id/txt_event_2_note"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="Ghi chú sự kiện 2"
+          android:textSize="10sp"
+          android:textColor="#CCFFFFFF"
+          android:singleLine="true"
+          android:ellipsize="end" />
+      </LinearLayout>
+    </LinearLayout>
+  </LinearLayout>
+</LinearLayout>
+`;
+
+const ANDROID_HELPER_KT = `package com.bonhiki1233.notein.lockscreen
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.graphics.Color
+import android.os.Build
+import android.view.View
+import android.widget.RemoteViews
+import androidx.core.app.NotificationCompat
+import com.bonhiki1233.notein.R
+import org.json.JSONArray
+import org.json.JSONObject
+
+object NoteInLockScreenHelper {
+  const val PREFS_NAME = "notein_lockscreen_prefs"
+  const val KEY_PAYLOAD = "payload_json"
+  const val KEY_ACTIVE_TAB = "active_tab"
+  const val KEY_ENABLED = "widget_enabled"
+
+  const val CHANNEL_ID = "notein-lockscreen-widget-v2"
+  const val NOTIFICATION_ID = 29041
+
+  const val ACTION_TAB_DAILY = "com.bonhiki1233.notein.ACTION_TAB_DAILY"
+  const val ACTION_TAB_CALENDAR = "com.bonhiki1233.notein.ACTION_TAB_CALENDAR"
+  const val ACTION_NOOP = "com.bonhiki1233.notein.ACTION_NOOP"
+
+  fun ensureChannel(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      val channel = NotificationChannel(
+        CHANNEL_ID,
+        "NoteIn Lock Screen Widget",
+        NotificationManager.IMPORTANCE_HIGH
+      ).apply {
+        description = "Interactive Lock Screen Schedule Widget (Daily & Desk Calendar)"
+        setSound(null, null)
+        enableVibration(false)
+        setShowBadge(false)
+        lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+      }
+      nm.createNotificationChannel(channel)
+    }
+  }
+
+  private fun populateRemoteViews(
+    context: Context,
+    rv: RemoteViews,
+    payload: JSONObject,
+    activeTab: String,
+    dailyPi: PendingIntent,
+    calendarPi: PendingIntent,
+    noopPi: PendingIntent,
+    isExpanded: Boolean
+  ) {
+    val tabDailyLabel = payload.optString("tabDailyLabel", "Lịch Daily")
+    val tabCalendarLabel = payload.optString("tabCalendarLabel", "Lịch Bàn")
+
+    rv.setTextViewText(R.id.btn_tab_daily, "🕒 \$tabDailyLabel")
+    rv.setTextViewText(R.id.btn_tab_calendar, "📅 \$tabCalendarLabel")
+
+    val isCalendar = activeTab == "calendar"
+    if (!isCalendar) {
+      rv.setInt(R.id.btn_tab_daily, "setBackgroundResource", R.drawable.notein_tab_daily_active)
+      rv.setTextColor(R.id.btn_tab_daily, Color.BLACK)
+      rv.setInt(R.id.btn_tab_calendar, "setBackgroundResource", R.drawable.notein_tab_inactive)
+      rv.setTextColor(R.id.btn_tab_calendar, Color.WHITE)
+    } else {
+      rv.setInt(R.id.btn_tab_daily, "setBackgroundResource", R.drawable.notein_tab_inactive)
+      rv.setTextColor(R.id.btn_tab_daily, Color.WHITE)
+      rv.setInt(R.id.btn_tab_calendar, "setBackgroundResource", R.drawable.notein_tab_calendar_active)
+      rv.setTextColor(R.id.btn_tab_calendar, Color.BLACK)
+    }
+
+    rv.setOnClickPendingIntent(R.id.btn_tab_daily, dailyPi)
+    rv.setOnClickPendingIntent(R.id.btn_tab_calendar, calendarPi)
+    rv.setOnClickPendingIntent(R.id.widget_root, noopPi)
+
+    if (!isCalendar) {
+      rv.setViewVisibility(R.id.daily_container, View.VISIBLE)
+      rv.setViewVisibility(R.id.calendar_container, View.GONE)
+
+      val currentBadge = payload.optString("currentBadge", "ĐANG DIỄN RA")
+      val currentTimeRange = payload.optString("currentTimeRange", "--:--")
+      val currentTitle = payload.optString("currentTitle", "")
+      val currentNote = payload.optString("currentNote", "")
+      val progressLabel = payload.optString("progressLabel", "Tiến độ")
+      val progressPct = payload.optInt("progressPct", 0).coerceIn(0, 100)
+
+      rv.setTextViewText(R.id.txt_current_badge, "⚡ \$currentBadge")
+      rv.setTextViewText(R.id.txt_current_time, currentTimeRange)
+      rv.setTextViewText(R.id.txt_current_title, currentTitle)
+
+      if (isExpanded && currentNote.isNotEmpty()) {
+        rv.setTextViewText(R.id.txt_current_note, currentNote)
+        rv.setViewVisibility(R.id.txt_current_note, View.VISIBLE)
+      } else {
+        rv.setViewVisibility(R.id.txt_current_note, View.GONE)
+      }
+
+      rv.setTextViewText(R.id.txt_progress_label, progressLabel)
+      rv.setProgressBar(R.id.progress_bar, 100, progressPct, false)
+      rv.setTextViewText(R.id.txt_progress_pct, "\$progressPct%")
+    } else {
+      rv.setViewVisibility(R.id.daily_container, View.GONE)
+      rv.setViewVisibility(R.id.calendar_container, View.VISIBLE)
+
+      val emptyHint = payload.optString("emptyEventsHint", "Chưa có sự kiện nào trong ngày này.")
+      val events: JSONArray = payload.optJSONArray("calendarEvents") ?: JSONArray()
+
+      if (events.length() == 0) {
+        rv.setTextViewText(R.id.txt_empty_events, emptyHint)
+        rv.setViewVisibility(R.id.txt_empty_events, View.VISIBLE)
+        rv.setViewVisibility(R.id.event_row_1, View.GONE)
+        rv.setViewVisibility(R.id.event_row_2, View.GONE)
+      } else {
+        rv.setViewVisibility(R.id.txt_empty_events, View.GONE)
+
+        val ev1 = events.optJSONObject(0)
+        if (ev1 != null) {
+          rv.setViewVisibility(R.id.event_row_1, View.VISIBLE)
+          rv.setTextViewText(R.id.txt_event_1_time, ev1.optString("time", ""))
+          rv.setTextViewText(R.id.txt_event_1_title, ev1.optString("title", ""))
+          val note1 = ev1.optString("note", "")
+          if (isExpanded && note1.isNotEmpty()) {
+            rv.setTextViewText(R.id.txt_event_1_note, note1)
+            rv.setViewVisibility(R.id.txt_event_1_note, View.VISIBLE)
+          } else {
+            rv.setViewVisibility(R.id.txt_event_1_note, View.GONE)
+          }
+        } else {
+          rv.setViewVisibility(R.id.event_row_1, View.GONE)
+        }
+
+        val ev2 = events.optJSONObject(1)
+        if (ev2 != null) {
+          rv.setViewVisibility(R.id.event_row_2, View.VISIBLE)
+          rv.setTextViewText(R.id.txt_event_2_time, ev2.optString("time", ""))
+          rv.setTextViewText(R.id.txt_event_2_title, ev2.optString("title", ""))
+          val note2 = ev2.optString("note", "")
+          if (isExpanded && note2.isNotEmpty()) {
+            rv.setTextViewText(R.id.txt_event_2_note, note2)
+            rv.setViewVisibility(R.id.txt_event_2_note, View.VISIBLE)
+          } else {
+            rv.setViewVisibility(R.id.txt_event_2_note, View.GONE)
+          }
+        } else {
+          rv.setViewVisibility(R.id.event_row_2, View.GONE)
+        }
+      }
+    }
+  }
+
+  fun showOrUpdateWidget(context: Context, payloadJson: String, tabOverride: String? = null): Boolean {
+    try {
+      ensureChannel(context)
+      val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      val activeTab = tabOverride ?: prefs.getString(KEY_ACTIVE_TAB, "daily") ?: "daily"
+
+      prefs.edit()
+        .putString(KEY_PAYLOAD, payloadJson)
+        .putString(KEY_ACTIVE_TAB, activeTab)
+        .putBoolean(KEY_ENABLED, true)
+        .apply()
+
+      val payload = JSONObject(payloadJson)
+      val pkg = context.packageName
+
+      val dailyIntent = Intent(context, NoteInLockScreenReceiver::class.java).apply {
+        action = ACTION_TAB_DAILY
+      }
+      val calendarIntent = Intent(context, NoteInLockScreenReceiver::class.java).apply {
+        action = ACTION_TAB_CALENDAR
+      }
+      val noopIntent = Intent(context, NoteInLockScreenReceiver::class.java).apply {
+        action = ACTION_NOOP
+      }
+
+      val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      val dailyPi = PendingIntent.getBroadcast(context, 101, dailyIntent, flags)
+      val calendarPi = PendingIntent.getBroadcast(context, 102, calendarIntent, flags)
+      val noopPi = PendingIntent.getBroadcast(context, 103, noopIntent, flags)
+
+      val collapsedViews = RemoteViews(pkg, R.layout.notein_lock_widget_collapsed)
+      val expandedViews = RemoteViews(pkg, R.layout.notein_lock_widget_expanded)
+
+      populateRemoteViews(context, collapsedViews, payload, activeTab, dailyPi, calendarPi, noopPi, false)
+      populateRemoteViews(context, expandedViews, payload, activeTab, dailyPi, calendarPi, noopPi, true)
+
+      val currentTitle = payload.optString("currentTitle", "NoteIn")
+      val currentTimeRange = payload.optString("currentTimeRange", "")
+
+      val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        .setSmallIcon(R.mipmap.ic_launcher)
+        .setContentTitle(currentTitle)
+        .setContentText(currentTimeRange)
+        .setCustomContentView(collapsedViews)
+        .setCustomBigContentView(expandedViews)
+        .setCustomHeadsUpContentView(expandedViews)
+        .setContentIntent(noopPi)
+        .setOngoing(true)
+        .setAutoCancel(false)
+        .setOnlyAlertOnce(true)
+        .setSilent(true)
+        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        .setPriority(NotificationCompat.PRIORITY_MAX)
+        .setCategory(NotificationCompat.CATEGORY_SERVICE)
+        .build()
+
+      val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      nm.notify(NOTIFICATION_ID, notification)
+      return true
+    } catch (e: Exception) {
+      e.printStackTrace()
+      return false
+    }
+  }
+
+  fun dismissWidget(context: Context) {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    prefs.edit().putBoolean(KEY_ENABLED, false).apply()
+    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    nm.cancel(NOTIFICATION_ID)
+  }
+
+  fun isWidgetActive(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      return nm.activeNotifications.any { it.id == NOTIFICATION_ID }
+    }
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    return prefs.getBoolean(KEY_ENABLED, false)
+  }
+}
+`;
+
+const ANDROID_RECEIVER_KT = `package com.bonhiki1233.notein.lockscreen
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+
+class NoteInLockScreenReceiver : BroadcastReceiver() {
+  override fun onReceive(context: Context, intent: Intent?) {
+    val action = intent?.action ?: return
+    val prefs = context.getSharedPreferences(NoteInLockScreenHelper.PREFS_NAME, Context.MODE_PRIVATE)
+    val payloadJson = prefs.getString(NoteInLockScreenHelper.KEY_PAYLOAD, null) ?: return
+
+    when (action) {
+      NoteInLockScreenHelper.ACTION_TAB_DAILY -> {
+        NoteInLockScreenHelper.showOrUpdateWidget(context, payloadJson, "daily")
+      }
+      NoteInLockScreenHelper.ACTION_TAB_CALENDAR -> {
+        NoteInLockScreenHelper.showOrUpdateWidget(context, payloadJson, "calendar")
+      }
+      NoteInLockScreenHelper.ACTION_NOOP -> {
+        // Absorb stray tap on Lock Screen widget so app does not open
+      }
+    }
+  }
+}
+`;
+
+const ANDROID_MODULE_KT = `package com.bonhiki1233.notein.lockscreen
+
+import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReactContextBaseJavaModule
+import com.facebook.react.bridge.ReactMethod
+
+class NoteInLockScreenModule(reactContext: ReactApplicationContext) :
+  ReactContextBaseJavaModule(reactContext) {
+
+  override fun getName(): String = "NoteInLockScreen"
+
+  @ReactMethod
+  fun startOrUpdateLiveActivity(payloadJson: String, promise: Promise) {
+    val ok = NoteInLockScreenHelper.showOrUpdateWidget(reactApplicationContext, payloadJson, null)
+    promise.resolve(ok)
+  }
+
+  @ReactMethod
+  fun stopLiveActivity(promise: Promise) {
+    NoteInLockScreenHelper.dismissWidget(reactApplicationContext)
+    promise.resolve(true)
+  }
+
+  @ReactMethod
+  fun isLiveActivityActive(promise: Promise) {
+    val active = NoteInLockScreenHelper.isWidgetActive(reactApplicationContext)
+    promise.resolve(active)
+  }
+}
+`;
+
+const ANDROID_PACKAGE_KT = `package com.bonhiki1233.notein.lockscreen
+
+import com.facebook.react.ReactPackage
+import com.facebook.react.bridge.NativeModule
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.uimanager.ViewManager
+
+class NoteInLockScreenPackage : ReactPackage {
+  override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
+    return listOf(NoteInLockScreenModule(reactContext))
+  }
+
+  override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
+    return emptyList()
+  }
+}
+`;
+
 module.exports = function withNoteInLockScreen(config) {
   config = withInfoPlist(config, (mod) => {
     mod.modResults.NSSupportsLiveActivities = true;
@@ -635,6 +1522,98 @@ module.exports = function withNoteInLockScreen(config) {
 
     return mod;
   });
+
+  // Android Custom Interactive Lock Screen Widget (RemoteViews + BroadcastReceiver)
+  config = withDangerousMod(config, [
+    'android',
+    async (mod) => {
+      const androidRoot = mod.modRequest.platformProjectRoot;
+      const mainDir = path.join(androidRoot, 'app', 'src', 'main');
+      const resDrawableDir = path.join(mainDir, 'res', 'drawable');
+      const resLayoutDir = path.join(mainDir, 'res', 'layout');
+      const ktPkgDir = path.join(
+        mainDir,
+        'java',
+        'com',
+        'bonhiki1233',
+        'notein',
+        'lockscreen',
+      );
+
+      fs.mkdirSync(resDrawableDir, { recursive: true });
+      fs.mkdirSync(resLayoutDir, { recursive: true });
+      fs.mkdirSync(ktPkgDir, { recursive: true });
+
+      Object.entries(ANDROID_DRAWABLES).forEach(([fileName, xmlContent]) => {
+        fs.writeFileSync(path.join(resDrawableDir, fileName), xmlContent);
+      });
+
+      fs.writeFileSync(
+        path.join(resLayoutDir, 'notein_lock_widget_collapsed.xml'),
+        ANDROID_LAYOUT_COLLAPSED,
+      );
+      fs.writeFileSync(
+        path.join(resLayoutDir, 'notein_lock_widget_expanded.xml'),
+        ANDROID_LAYOUT_EXPANDED,
+      );
+
+      fs.writeFileSync(path.join(ktPkgDir, 'NoteInLockScreenHelper.kt'), ANDROID_HELPER_KT);
+      fs.writeFileSync(path.join(ktPkgDir, 'NoteInLockScreenReceiver.kt'), ANDROID_RECEIVER_KT);
+      fs.writeFileSync(path.join(ktPkgDir, 'NoteInLockScreenModule.kt'), ANDROID_MODULE_KT);
+      fs.writeFileSync(path.join(ktPkgDir, 'NoteInLockScreenPackage.kt'), ANDROID_PACKAGE_KT);
+
+      // Register POST_NOTIFICATIONS and NoteInLockScreenReceiver in AndroidManifest.xml
+      const manifestPath = path.join(mainDir, 'AndroidManifest.xml');
+      if (fs.existsSync(manifestPath)) {
+        let manifest = fs.readFileSync(manifestPath, 'utf8');
+        if (!manifest.includes('android.permission.POST_NOTIFICATIONS')) {
+          manifest = manifest.replace(
+            '<uses-permission android:name="android.permission.INTERNET"/>',
+            '<uses-permission android:name="android.permission.INTERNET"/>\n  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>',
+          );
+        }
+        if (!manifest.includes('NoteInLockScreenReceiver')) {
+          manifest = manifest.replace(
+            '</application>',
+            `    <receiver android:name=".lockscreen.NoteInLockScreenReceiver" android:exported="false">
+      <intent-filter>
+        <action android:name="com.bonhiki1233.notein.ACTION_TAB_DAILY"/>
+        <action android:name="com.bonhiki1233.notein.ACTION_TAB_CALENDAR"/>
+        <action android:name="com.bonhiki1233.notein.ACTION_NOOP"/>
+      </intent-filter>
+    </receiver>\n  </application>`,
+          );
+        }
+        fs.writeFileSync(manifestPath, manifest);
+      }
+
+      // Register NoteInLockScreenPackage in MainApplication.kt
+      const mainAppPath = path.join(
+        mainDir,
+        'java',
+        'com',
+        'bonhiki1233',
+        'notein',
+        'MainApplication.kt',
+      );
+      if (fs.existsSync(mainAppPath)) {
+        let mainApp = fs.readFileSync(mainAppPath, 'utf8');
+        if (!mainApp.includes('NoteInLockScreenPackage')) {
+          mainApp = mainApp.replace(
+            'package com.bonhiki1233.notein',
+            'package com.bonhiki1233.notein\n\nimport com.bonhiki1233.notein.lockscreen.NoteInLockScreenPackage',
+          );
+          mainApp = mainApp.replace(
+            'PackageList(this).packages.apply {',
+            'PackageList(this).packages.apply {\n          add(NoteInLockScreenPackage())',
+          );
+          fs.writeFileSync(mainAppPath, mainApp);
+        }
+      }
+
+      return mod;
+    },
+  ]);
 
   return config;
 };

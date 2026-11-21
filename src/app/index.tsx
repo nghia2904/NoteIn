@@ -7,6 +7,7 @@ import { BottomTabBar, type MainTab } from '../components/BottomTabBar';
 import { CalendarTab } from '../components/CalendarTab';
 import { DailyTab } from '../components/DailyTab';
 import { OtherTab } from '../components/OtherTab';
+import { WebWorkspace } from '../components/web/WebWorkspace';
 import { useNow } from '../hooks/useNow';
 import { translations } from '../i18n/translations';
 import {
@@ -171,6 +172,17 @@ export default function HomeScreen() {
     setActiveTab('daily');
     setOpenAddDailyRequest(true);
   };
+
+  if (Platform.OS === 'web') {
+    return (
+      <WebWorkspace
+        now={now}
+        timeline={timeline}
+        onToggleDailyDone={handleToggleDone}
+        onDataChange={reload}
+      />
+    );
+  }
 
   return (
     <View style={[styles.root, isDark ? styles.rootDark : styles.rootLight]}>

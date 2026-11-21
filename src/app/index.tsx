@@ -55,12 +55,18 @@ export default function HomeScreen() {
     if (Platform.OS !== 'android') return;
 
     let active = true;
-    isAndroidScheduleNotificationActive()
+    enableAndroidScheduleNotification(
+      dailies,
+      events,
+      completions,
+      new Date(),
+      language,
+    )
       .then((enabled) => {
-        if (active && enabled) setAndroidNotificationEnabled(true);
+        if (active) setAndroidNotificationEnabled(enabled);
       })
       .catch((error) => {
-        console.warn('Failed to read Android notification state:', error);
+        console.warn('Failed to enable Android Lock Screen widget:', error);
       });
 
     return () => {

@@ -29,8 +29,8 @@ import {
   useWebWorkspaceStore,
 } from '../../store/webWorkspaceStore';
 
-const COLOR_INCOME = '#16a34a'; // Xanh lá cho Thu nhập (+)
-const COLOR_EXPENSE = '#ef4444'; // Đỏ cho Chi tiêu (-)
+const COLOR_INCOME = '#16a34a'; // Xanh lá cho số tiền dương (+)
+const COLOR_EXPENSE = '#ef4444'; // Đỏ cho số tiền âm (-)
 
 function formatVnd(amount: number): string {
   return Math.abs(amount).toLocaleString('vi-VN') + ' ₫';
@@ -141,12 +141,6 @@ export function WebFinanceTab({ now }: { now: Date }) {
     periodMode === 'month' ? monthDisplayLabel : yearDisplayLabel;
 
   const {
-    monthIncome,
-    monthExpense,
-    monthBalance,
-    yearIncome,
-    yearExpense,
-    yearBalance,
     periodIncome,
     periodExpense,
     periodBalance,
@@ -158,10 +152,6 @@ export function WebFinanceTab({ now }: { now: Date }) {
     periodTxs,
     txGroupsByDate,
   } = useMemo(() => {
-    let mInc = 0;
-    let mExp = 0;
-    let yInc = 0;
-    let yExp = 0;
     let pInc = 0;
     let pExp = 0;
 
@@ -185,15 +175,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
         dMap[tx.date].expense += tx.amount;
       }
 
-      if (tx.date.startsWith(monthPrefix)) {
-        if (tx.type === 'income') mInc += tx.amount;
-        else mExp += tx.amount;
-      }
-
       if (tx.date.startsWith(yearPrefix)) {
-        if (tx.type === 'income') yInc += tx.amount;
-        else yExp += tx.amount;
-
         const mIdx = Number(tx.date.slice(5, 7)) - 1;
         if (mIdx >= 0 && mIdx < 12) {
           if (tx.type === 'income') months12[mIdx].income += tx.amount;
@@ -264,12 +246,6 @@ export function WebFinanceTab({ now }: { now: Date }) {
     );
 
     return {
-      monthIncome: mInc,
-      monthExpense: mExp,
-      monthBalance: mInc - mExp,
-      yearIncome: yInc,
-      yearExpense: yExp,
-      yearBalance: yInc - yExp,
       periodIncome: pInc,
       periodExpense: pExp,
       periodBalance: pInc - pExp,
@@ -281,7 +257,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
       periodTxs: pList,
       txGroupsByDate,
     };
-  }, [transactions, monthPrefix, yearPrefix, periodPrefix, selectedDate]);
+  }, [transactions, yearPrefix, periodPrefix, selectedDate]);
 
   // Build calendar grid for currentPeriodDate's month
   const calendarDays = useMemo(() => {
@@ -301,17 +277,10 @@ export function WebFinanceTab({ now }: { now: Date }) {
     ? ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
     : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // Monthly Pie Chart %
-  const monthTotalVol = monthIncome + monthExpense;
-  const monthIncPct =
-    monthTotalVol > 0 ? Math.round((monthIncome / monthTotalVol) * 100) : 0;
-  const monthExpPct = monthTotalVol > 0 ? 100 - monthIncPct : 0;
-
-  // Yearly Pie Chart %
-  const yearTotalVol = yearIncome + yearExpense;
-  const yearIncPct =
-    yearTotalVol > 0 ? Math.round((yearIncome / yearTotalVol) * 100) : 0;
-  const yearExpPct = yearTotalVol > 0 ? 100 - yearIncPct : 0;
+  const totalVolume = periodIncome + periodExpense;
+  const incomePct =
+    totalVolume > 0 ? Math.round((periodIncome / totalVolume) * 100) : 0;
+  const expensePct = totalVolume > 0 ? 100 - incomePct : 0;
 
   const isPositiveBalance = periodBalance >= 0;
 
@@ -333,7 +302,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
         </View>
 
         <View style={styles.headerControls}>
-          {/* Period Mode Toggle: Theo tháng | Cả năm */}
+          {/* Period Mode Toggle: Tháng | Năm */}
           <View style={[styles.subTabGroup, isDark && styles.cardDark]}>
             <Pressable
               onPress={() => setPeriodMode('month')}
@@ -348,14 +317,11 @@ export function WebFinanceTab({ now }: { now: Date }) {
                   periodMode === 'month' && styles.subTabTextActive,
                 ]}
               >
-                {isVi ? 'Theo tháng' : 'Monthly'}
+                {isVi ? 'Tháng' : 'Month'}
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => {
-                setPeriodMode('year');
-                setRightSubTab('report');
-              }}
+              onPress={() => setPeriodMode('year')}
               style={[
                 styles.subTabBtn,
                 periodMode === 'year' && styles.periodModeBtnActive,
@@ -367,7 +333,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                   periodMode === 'year' && styles.subTabTextActive,
                 ]}
               >
-                {isVi ? 'Cả năm' : 'Full Year'}
+                {isVi ? 'Năm' : 'Year'}
               </Text>
             </Pressable>
           </View>
@@ -393,7 +359,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
             </Pressable>
           </View>
 
-          {/* Sub-view Toggle: Báo cáo & Biểu đồ | Lịch thu chi */}
+          {/* Sub-view Toggle: Biểu đồ & Báo cáo | Lịch thu chi */}
           <View style={[styles.subTabGroup, isDark && styles.cardDark]}>
             <Pressable
               onPress={() => setRightSubTab('report')}
@@ -431,17 +397,17 @@ export function WebFinanceTab({ now }: { now: Date }) {
         </View>
       </View>
 
-      {/* 3 Summary Cards: Thu nhập (+) Xanh | Chi tiêu (-) Đỏ | Tổng thu chi (Xanh nếu +, Đỏ nếu -) */}
+      {/* 3 Summary Cards: + and - ONLY stand with money amounts */}
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, isDark && styles.cardDark]}>
           <Text style={[styles.summaryLabel, isDark && styles.subTextDark]}>
             {periodMode === 'month'
               ? isVi
-                ? `THU NHẬP · ${monthDisplayLabel.toUpperCase()} (+)`
-                : 'MONTHLY INCOME (+)'
+                ? `THU NHẬP · ${monthDisplayLabel.toUpperCase()}`
+                : 'MONTHLY INCOME'
               : isVi
-                ? `THU NHẬP CẢ ${yearDisplayLabel.toUpperCase()} (+)`
-                : 'YEARLY INCOME (+)'}
+                ? `THU NHẬP · ${yearDisplayLabel.toUpperCase()}`
+                : 'YEARLY INCOME'}
           </Text>
           <Text style={[styles.summaryValue, { color: COLOR_INCOME }]}>
             +{formatVnd(periodIncome)}
@@ -452,11 +418,11 @@ export function WebFinanceTab({ now }: { now: Date }) {
           <Text style={[styles.summaryLabel, isDark && styles.subTextDark]}>
             {periodMode === 'month'
               ? isVi
-                ? `CHI TIÊU · ${monthDisplayLabel.toUpperCase()} (-)`
-                : 'MONTHLY EXPENSE (-)'
+                ? `CHI TIÊU · ${monthDisplayLabel.toUpperCase()}`
+                : 'MONTHLY EXPENSE'
               : isVi
-                ? `CHI TIÊU CẢ ${yearDisplayLabel.toUpperCase()} (-)`
-                : 'YEARLY EXPENSE (-)'}
+                ? `CHI TIÊU · ${yearDisplayLabel.toUpperCase()}`
+                : 'YEARLY EXPENSE'}
           </Text>
           <Text style={[styles.summaryValue, { color: COLOR_EXPENSE }]}>
             -{formatVnd(periodExpense)}
@@ -480,10 +446,10 @@ export function WebFinanceTab({ now }: { now: Date }) {
           >
             {periodMode === 'month'
               ? isVi
-                ? 'TỔNG THU CHI THÁNG (THU - CHI)'
+                ? 'TỔNG THU CHI THÁNG'
                 : 'MONTHLY NET BALANCE'
               : isVi
-                ? 'TỔNG THU CHI CẢ NĂM (THU - CHI)'
+                ? 'TỔNG THU CHI NĂM'
                 : 'YEARLY NET BALANCE'}
           </Text>
           <Text
@@ -497,7 +463,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
         </View>
       </View>
 
-      {/* Main Split: Left Input Form + Right Dual Pie Charts (Tháng & Cả Năm), Calendar & Daily Grouped List */}
+      {/* Main Split: Left Input Form + Right Pie Chart (Tháng / Năm Switcher), Calendar & Daily Grouped List */}
       <View style={styles.mainRow}>
         {/* LEFT: Input Panel */}
         <View style={[styles.inputPanel, isDark && styles.cardDark]}>
@@ -515,7 +481,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                   txType === 'expense' && styles.typeSwitchTextActive,
                 ]}
               >
-                {isVi ? '− Tiền chi' : '− Expense'}
+                {isVi ? 'Tiền chi' : 'Expense'}
               </Text>
             </Pressable>
             <Pressable
@@ -531,7 +497,7 @@ export function WebFinanceTab({ now }: { now: Date }) {
                   txType === 'income' && styles.typeSwitchTextActive,
                 ]}
               >
-                {isVi ? '+ Tiền thu' : '+ Income'}
+                {isVi ? 'Tiền thu' : 'Income'}
               </Text>
             </Pressable>
           </View>
@@ -679,203 +645,168 @@ export function WebFinanceTab({ now }: { now: Date }) {
             <Text style={styles.submitBtnText}>
               {txType === 'expense'
                 ? isVi
-                  ? '− Lưu khoản Tiền chi'
-                  : '− Save Expense'
+                  ? 'Lưu khoản Tiền chi'
+                  : 'Save Expense'
                 : isVi
-                  ? '+ Lưu khoản Tiền thu'
-                  : '+ Save Income'}
+                  ? 'Lưu khoản Tiền thu'
+                  : 'Save Income'}
             </Text>
           </Pressable>
         </View>
 
-        {/* RIGHT: Always-visible Dual Pie Charts (Tháng & Cả Năm) + Calendar / Category Details + Daily Grouped List */}
+        {/* RIGHT: Single Pie Chart with Tháng / Năm Toggle OR Calendar + Daily Grouped List */}
         <View style={styles.rightCol}>
-          {/* DUAL PIE CHARTS CARD: Biểu đồ tròn Tháng & Biểu đồ tròn Cả Năm */}
-          <View style={[styles.reportCard, isDark && styles.cardDark]}>
-            <View style={styles.calTopRow}>
-              <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
-                {isVi
-                  ? 'Biểu đồ tròn Thu nhập (+) & Chi tiêu (−) · Theo Tháng & Cả Năm'
-                  : 'Monthly & Full-Year Income (+) vs Expense (−) Pie Charts'}
-              </Text>
-              <Text style={styles.calHint}>
-                {isVi
-                  ? 'Bấm vào từng biểu đồ để xem chi tiết theo Tháng hoặc Cả Năm'
-                  : 'Click a chart to switch between Monthly and Full-Year view'}
-              </Text>
-            </View>
-
-            <View style={styles.dualPieRow}>
-              {/* PIE 1: BIỂU ĐỒ TRÒN THEO THÁNG */}
-              <Pressable
-                onPress={() => setPeriodMode('month')}
-                style={[
-                  styles.pieBoxCard,
-                  isDark && styles.rowDark,
-                  periodMode === 'month' && styles.pieBoxCardActive,
-                ]}
-              >
-                <Text style={[styles.pieBoxTitle, isDark && styles.textDark]}>
-                  📊 {isVi ? `Biểu đồ ${monthDisplayLabel}` : monthDisplayLabel}
-                </Text>
-
-                <View style={styles.pieWithLegendRow}>
-                  <View
-                    style={[
-                      styles.pieOuterCircle,
-                      buildConicPieStyle(monthIncome, monthExpense),
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.pieInnerHole,
-                        isDark && { backgroundColor: '#0f172a' },
-                      ]}
-                    >
-                      <Text style={styles.pieCenterLabel}>
-                        {isVi ? 'THÁNG' : 'MONTH'}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.pieCenterValue,
-                          {
-                            color:
-                              monthBalance >= 0 ? COLOR_INCOME : COLOR_EXPENSE,
-                          },
-                        ]}
-                      >
-                        {monthBalance >= 0 ? '+' : '-'}
-                        {formatCompactVnd(monthBalance)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.miniLegendCol}>
-                    <View style={styles.miniLegendItem}>
-                      <View style={styles.miniLegendHeader}>
-                        <View
-                          style={[
-                            styles.legendDot,
-                            { backgroundColor: COLOR_INCOME },
-                          ]}
-                        />
-                        <Text style={[styles.miniLegendLabel, isDark && styles.textDark]}>
-                          {isVi ? 'Thu nhập' : 'Income'} ({monthIncPct}%)
-                        </Text>
-                      </View>
-                      <Text style={[styles.miniLegendVal, { color: COLOR_INCOME }]}>
-                        +{formatVnd(monthIncome)}
-                      </Text>
-                    </View>
-
-                    <View style={styles.miniLegendItem}>
-                      <View style={styles.miniLegendHeader}>
-                        <View
-                          style={[
-                            styles.legendDot,
-                            { backgroundColor: COLOR_EXPENSE },
-                          ]}
-                        />
-                        <Text style={[styles.miniLegendLabel, isDark && styles.textDark]}>
-                          {isVi ? 'Chi tiêu' : 'Expense'} ({monthExpPct}%)
-                        </Text>
-                      </View>
-                      <Text style={[styles.miniLegendVal, { color: COLOR_EXPENSE }]}>
-                        -{formatVnd(monthExpense)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </Pressable>
-
-              {/* PIE 2: BIỂU ĐỒ TRÒN CẢ NĂM */}
-              <Pressable
-                onPress={() => setPeriodMode('year')}
-                style={[
-                  styles.pieBoxCard,
-                  isDark && styles.rowDark,
-                  periodMode === 'year' && styles.pieBoxCardActive,
-                ]}
-              >
-                <Text style={[styles.pieBoxTitle, isDark && styles.textDark]}>
-                  📈 {isVi ? `Biểu đồ Cả ${yearDisplayLabel}` : `Full ${yearDisplayLabel}`}
-                </Text>
-
-                <View style={styles.pieWithLegendRow}>
-                  <View
-                    style={[
-                      styles.pieOuterCircle,
-                      buildConicPieStyle(yearIncome, yearExpense),
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.pieInnerHole,
-                        isDark && { backgroundColor: '#0f172a' },
-                      ]}
-                    >
-                      <Text style={styles.pieCenterLabel}>
-                        {isVi ? 'CẢ NĂM' : 'YEAR'}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.pieCenterValue,
-                          {
-                            color:
-                              yearBalance >= 0 ? COLOR_INCOME : COLOR_EXPENSE,
-                          },
-                        ]}
-                      >
-                        {yearBalance >= 0 ? '+' : '-'}
-                        {formatCompactVnd(yearBalance)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.miniLegendCol}>
-                    <View style={styles.miniLegendItem}>
-                      <View style={styles.miniLegendHeader}>
-                        <View
-                          style={[
-                            styles.legendDot,
-                            { backgroundColor: COLOR_INCOME },
-                          ]}
-                        />
-                        <Text style={[styles.miniLegendLabel, isDark && styles.textDark]}>
-                          {isVi ? 'Thu cả năm' : 'Year Income'} ({yearIncPct}%)
-                        </Text>
-                      </View>
-                      <Text style={[styles.miniLegendVal, { color: COLOR_INCOME }]}>
-                        +{formatVnd(yearIncome)}
-                      </Text>
-                    </View>
-
-                    <View style={styles.miniLegendItem}>
-                      <View style={styles.miniLegendHeader}>
-                        <View
-                          style={[
-                            styles.legendDot,
-                            { backgroundColor: COLOR_EXPENSE },
-                          ]}
-                        />
-                        <Text style={[styles.miniLegendLabel, isDark && styles.textDark]}>
-                          {isVi ? 'Chi cả năm' : 'Year Expense'} ({yearExpPct}%)
-                        </Text>
-                      </View>
-                      <Text style={[styles.miniLegendVal, { color: COLOR_EXPENSE }]}>
-                        -{formatVnd(yearExpense)}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </Pressable>
-            </View>
-          </View>
-
           {rightSubTab === 'report' ? (
-            /* CATEGORY BREAKDOWN & 12-MONTH YEARLY TABLE */
             <View style={[styles.reportCard, isDark && styles.cardDark]}>
-              {/* If viewing Full Year, show 12-Month Summary Grid */}
+              {/* Chart Header with 2-Tab Switcher: Tháng | Năm */}
+              <View style={styles.calTopRow}>
+                <View>
+                  <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
+                    {isVi
+                      ? `Biểu đồ Thu Chi · ${periodDisplayLabel}`
+                      : `Income vs Expense Pie Chart · ${periodDisplayLabel}`}
+                  </Text>
+                  <Text style={styles.calHint}>
+                    {isVi
+                      ? 'Màu xanh: Thu nhập · Màu đỏ: Chi tiêu'
+                      : 'Green: Income · Red: Expense'}
+                  </Text>
+                </View>
+
+                {/* Inline Switcher: Tháng | Năm */}
+                <View style={[styles.subTabGroup, isDark && styles.rowDark]}>
+                  <Pressable
+                    onPress={() => setPeriodMode('month')}
+                    style={[
+                      styles.subTabBtn,
+                      periodMode === 'month' && styles.periodModeBtnActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.subTabText,
+                        periodMode === 'month' && styles.subTabTextActive,
+                      ]}
+                    >
+                      {isVi ? 'Tháng' : 'Month'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setPeriodMode('year')}
+                    style={[
+                      styles.subTabBtn,
+                      periodMode === 'year' && styles.periodModeBtnActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.subTabText,
+                        periodMode === 'year' && styles.subTabTextActive,
+                      ]}
+                    >
+                      {isVi ? 'Năm' : 'Year'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Single Large 2-Color Pie Chart (Green = Thu nhập, Red = Chi tiêu) for selected Tháng or Năm */}
+              <View style={styles.pieSectionRow}>
+                <View
+                  style={[
+                    styles.pieOuterCircle,
+                    buildConicPieStyle(periodIncome, periodExpense),
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.pieInnerHole,
+                      isDark && { backgroundColor: '#1e293b' },
+                    ]}
+                  >
+                    <Text style={styles.pieCenterLabel}>
+                      {periodMode === 'month'
+                        ? isVi
+                          ? 'CÂN ĐỐI THÁNG'
+                          : 'MONTH NET'
+                        : isVi
+                          ? 'CÂN ĐỐI NĂM'
+                          : 'YEAR NET'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.pieCenterValue,
+                        {
+                          color: isPositiveBalance
+                            ? COLOR_INCOME
+                            : COLOR_EXPENSE,
+                        },
+                      ]}
+                    >
+                      {isPositiveBalance ? '+' : '-'}
+                      {formatCompactVnd(periodBalance)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.pieLegendCol}>
+                  <View
+                    style={[
+                      styles.legendCard,
+                      styles.legendCardIncome,
+                      isDark && styles.rowDark,
+                    ]}
+                  >
+                    <View style={styles.legendTitleRow}>
+                      <View
+                        style={[
+                          styles.legendDot,
+                          { backgroundColor: COLOR_INCOME },
+                        ]}
+                      />
+                      <Text style={[styles.legendLabel, isDark && styles.textDark]}>
+                        {isVi ? 'Thu nhập' : 'Income'}
+                      </Text>
+                      <Text style={[styles.legendPct, { color: COLOR_INCOME }]}>
+                        {incomePct}%
+                      </Text>
+                    </View>
+                    <Text style={[styles.legendAmount, { color: COLOR_INCOME }]}>
+                      +{formatVnd(periodIncome)}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.legendCard,
+                      styles.legendCardExpense,
+                      isDark && styles.rowDark,
+                    ]}
+                  >
+                    <View style={styles.legendTitleRow}>
+                      <View
+                        style={[
+                          styles.legendDot,
+                          { backgroundColor: COLOR_EXPENSE },
+                        ]}
+                      />
+                      <Text style={[styles.legendLabel, isDark && styles.textDark]}>
+                        {isVi ? 'Chi tiêu' : 'Expense'}
+                      </Text>
+                      <Text style={[styles.legendPct, { color: COLOR_EXPENSE }]}>
+                        {expensePct}%
+                      </Text>
+                    </View>
+                    <Text style={[styles.legendAmount, { color: COLOR_EXPENSE }]}>
+                      -{formatVnd(periodExpense)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* If viewing Year mode, show 12-Month Summary Grid */}
               {periodMode === 'year' && (
                 <>
                   <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
@@ -929,8 +860,8 @@ export function WebFinanceTab({ now }: { now: Date }) {
               {/* Category Details: Expense Categories (Red) & Income Categories (Green) */}
               <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
                 {isVi
-                  ? `Chi tiết Chi tiêu theo danh mục (−) · ${periodDisplayLabel}`
-                  : `Expense Breakdown by Category (−) · ${periodDisplayLabel}`}
+                  ? `Chi tiết Chi tiêu theo danh mục · ${periodDisplayLabel}`
+                  : `Expense Breakdown by Category · ${periodDisplayLabel}`}
               </Text>
 
               {expenseByCategory.length === 0 ? (
@@ -972,8 +903,8 @@ export function WebFinanceTab({ now }: { now: Date }) {
 
               <Text style={[styles.sectionTitle, isDark && styles.textDark]}>
                 {isVi
-                  ? `Chi tiết Thu nhập theo danh mục (+) · ${periodDisplayLabel}`
-                  : `Income Breakdown by Category (+) · ${periodDisplayLabel}`}
+                  ? `Chi tiết Thu nhập theo danh mục · ${periodDisplayLabel}`
+                  : `Income Breakdown by Category · ${periodDisplayLabel}`}
               </Text>
               {incomeByCategory.length === 0 ? (
                 <Text style={[styles.emptyHint, isDark && styles.subTextDark]}>
@@ -1021,8 +952,8 @@ export function WebFinanceTab({ now }: { now: Date }) {
                 </Text>
                 <Text style={styles.calHint}>
                   {isVi
-                    ? 'Thu nhập (+) màu xanh · Chi tiêu (−) màu đỏ'
-                    : 'Income (+) in green · Expense (−) in red'}
+                    ? 'Màu xanh: Thu nhập · Màu đỏ: Chi tiêu'
+                    : 'Green: Income · Red: Expense'}
                 </Text>
               </View>
 
@@ -1395,7 +1326,7 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   subTabBtn: {
-    paddingHorizontal: 13,
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 99,
   },
@@ -1623,89 +1554,85 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#6b7280',
   },
-  // Dual Pie Chart Styles
-  dualPieRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 14,
-  },
-  pieBoxCard: {
-    flex: 1,
-    minWidth: 270,
-    backgroundColor: '#fbfaf7',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#e5e4de',
-    gap: 12,
-  },
-  pieBoxCardActive: {
-    borderColor: '#18181b',
-    backgroundColor: '#ffffff',
-  },
-  pieBoxTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#111827',
-  },
-  pieWithLegendRow: {
+  // Single Pie Chart Styles
+  pieSectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 28,
+    paddingVertical: 10,
   },
   pieOuterCircle: {
-    width: 126,
-    height: 126,
+    width: 190,
+    height: 190,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pieInnerHole: {
-    width: 78,
-    height: 78,
+    width: 116,
+    height: 116,
     borderRadius: 999,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
   },
   pieCenterLabel: {
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '800',
     color: '#6b7280',
     letterSpacing: 0.5,
   },
   pieCenterValue: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '900',
-    marginTop: 1,
+    marginTop: 2,
   },
-  miniLegendCol: {
+  pieLegendCol: {
     flex: 1,
-    gap: 10,
+    minWidth: 220,
+    gap: 12,
   },
-  miniLegendItem: {
-    gap: 2,
+  legendCard: {
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 4,
   },
-  miniLegendHeader: {
+  legendCardIncome: {
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
+  },
+  legendCardExpense: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  legendTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   legendDot: {
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
     borderRadius: 99,
   },
-  miniLegendLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#374151',
+  legendLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#111827',
   },
-  miniLegendVal: {
+  legendPct: {
     fontSize: 14,
     fontWeight: '900',
-    paddingLeft: 16,
+  },
+  legendAmount: {
+    fontSize: 18,
+    fontWeight: '900',
+    paddingLeft: 20,
   },
   // 12-Month Grid inside Yearly view
   months12Grid: {

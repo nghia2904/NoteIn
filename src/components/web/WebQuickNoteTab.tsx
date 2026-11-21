@@ -187,6 +187,17 @@ export function WebQuickNoteTab() {
                         {item.pinned ? '📌 ' : ''}
                         {item.title || (isVi ? 'Chưa đặt tiêu đề' : 'Untitled')}
                       </Text>
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          updateQuickNote(item.id, { pinned: !item.pinned });
+                        }}
+                        style={styles.pinIconQuickBtn}
+                      >
+                        <Text style={{ fontSize: 11, opacity: item.pinned ? 1 : 0.35 }}>
+                          📌
+                        </Text>
+                      </Pressable>
                     </View>
                     <Text
                       style={[
@@ -197,14 +208,31 @@ export function WebQuickNoteTab() {
                     >
                       {item.content || (isVi ? 'Chưa có nội dung...' : 'No content...')}
                     </Text>
-                    <Text
-                      style={[
-                        styles.noteCardDate,
-                        selected && styles.noteCardPreviewSelected,
-                      ]}
-                    >
-                      {dateDisplay}
-                    </Text>
+                    <View style={styles.noteCardFooterRow}>
+                      <Text
+                        style={[
+                          styles.noteCardDate,
+                          selected && styles.noteCardPreviewSelected,
+                        ]}
+                      >
+                        {dateDisplay}
+                      </Text>
+                      {item.folder !== 'all' && (
+                        <Text style={styles.noteFolderBadge}>
+                          {item.folder === 'work'
+                            ? isVi
+                              ? '💼 Công việc'
+                              : '💼 Work'
+                            : item.folder === 'ideas'
+                              ? isVi
+                                ? '💡 Ý tưởng'
+                                : '💡 Ideas'
+                              : isVi
+                                ? '🌿 Cá nhân'
+                                : '🌿 Personal'}
+                        </Text>
+                      )}
+                    </View>
                   </Pressable>
                 );
               })
@@ -245,8 +273,21 @@ export function WebQuickNoteTab() {
                       isDark && styles.rowDark,
                     ]}
                   >
-                    <Text style={[styles.toolBtnText, isDark && styles.textDark]}>
-                      📌 {activeNote.pinned ? (isVi ? 'Đã ghim' : 'Pinned') : isVi ? 'Ghim' : 'Pin'}
+                    <Text
+                      style={[
+                        styles.toolBtnText,
+                        isDark && styles.textDark,
+                        activeNote.pinned && styles.toolBtnPinnedText,
+                      ]}
+                    >
+                      📌{' '}
+                      {activeNote.pinned
+                        ? isVi
+                          ? 'Đã ghim (Bấm để bỏ)'
+                          : 'Pinned'
+                        : isVi
+                          ? 'Ghim ghi chú'
+                          : 'Pin Note'}
                     </Text>
                   </Pressable>
                 </View>
@@ -259,6 +300,48 @@ export function WebQuickNoteTab() {
                     🗑 {isVi ? 'Xóa' : 'Delete'}
                   </Text>
                 </Pressable>
+              </View>
+
+              {/* Folder Assignment Row: Put Note into Công việc / Ý tưởng / Cá nhân */}
+              <View style={[styles.assignFolderBar, isDark && styles.rowDark]}>
+                <Text style={[styles.assignFolderLabel, isDark && styles.subTextDark]}>
+                  {isVi ? 'Phân loại vào mục:' : 'Move to folder:'}
+                </Text>
+                {(
+                  [
+                    { id: 'work', label: isVi ? '💼 Công việc' : '💼 Work' },
+                    { id: 'ideas', label: isVi ? '💡 Ý tưởng' : '💡 Ideas' },
+                    { id: 'personal', label: isVi ? '🌿 Cá nhân' : '🌿 Personal' },
+                  ] as const
+                ).map((f) => {
+                  const isAssigned = activeNote.folder === f.id;
+                  return (
+                    <Pressable
+                      key={f.id}
+                      onPress={() =>
+                        updateQuickNote(activeNote.id, {
+                          folder: isAssigned ? 'all' : f.id,
+                        })
+                      }
+                      style={[
+                        styles.assignFolderChip,
+                        isDark && styles.cardDark,
+                        isAssigned && styles.assignFolderChipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.assignFolderChipText,
+                          isDark && styles.textDark,
+                          isAssigned && styles.assignFolderChipTextActive,
+                        ]}
+                      >
+                        {isAssigned ? '✓ ' : ''}
+                        {f.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
 
               <Text style={styles.editorTimestamp}>
@@ -522,7 +605,71 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20,
   },
+  pinIconQuickBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  noteCardFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  noteFolderBadge: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#4b5563',
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 99,
+  },
+  toolBtnPinnedText: {
+    color: '#92400e',
+    fontWeight: '800',
+  },
+  assignFolderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: '#f9fafb',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  assignFolderLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6b7280',
+    marginRight: 4,
+  },
+  assignFolderChip: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  assignFolderChipActive: {
+    backgroundColor: '#18181b',
+    borderColor: '#18181b',
+  },
+  assignFolderChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  assignFolderChipTextActive: {
+    color: '#ffffff',
+  },
   textDark: {
     color: '#f8fafc',
+  },
+  subTextDark: {
+    color: '#94a3b8',
   },
 });

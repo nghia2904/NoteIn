@@ -311,7 +311,7 @@ const INITIAL_NOTES: QuickNoteItem[] = [
     id: 'note-1',
     title: '📌 Kế hoạch phát triển NoteIn Workspace',
     content:
-      '• Hoàn thiện giao diện Web theo phong cách Notion & Google Calendar\n• Tích hợp sơ đồ tư duy (Mindmap) cho từng Project\n• Theo dõi thu chi cá nhân kiểu MoneyNote\n• Toàn bộ dữ liệu lưu an toàn trên trình duyệt cá nhân (LocalStorage)',
+      '• Hoàn thiện giao diện Web theo phong cách Notion & Google Calendar\n• Tích hợp sơ đồ tư duy (Mindmap) cho từng Project\n• Theo dõi thu chi & biểu đồ tài chính cá nhân\n• Toàn bộ dữ liệu lưu an toàn trên trình duyệt cá nhân (LocalStorage)',
     folder: 'work',
     pinned: true,
     updatedAt: new Date().toISOString(),
@@ -364,7 +364,7 @@ const INITIAL_PROJECTS: ProjectItem[] = [
         id: 'n-103',
         parentId: 'root-1',
         title: 'Quản lý Tài chính',
-        subtitle: 'MoneyNote thu chi & thống kê',
+        subtitle: 'Theo dõi thu chi & biểu đồ thống kê',
       },
       {
         id: 'n-104',

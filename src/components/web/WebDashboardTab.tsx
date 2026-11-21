@@ -220,7 +220,7 @@ export function WebDashboardTab({
                     .filter((t) => t.type === 'expense' && t.date === todayStr)
                     .reduce((s, t) => s + t.amount, 0),
                 )}`
-              : 'Tap to open MoneyNote Finance'}
+              : 'Tap to open Finance'}
           </Text>
         </Pressable>
       </View>

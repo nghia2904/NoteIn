@@ -1,0 +1,6 @@
+import { applyForm, maintenanceToForm, removedPartNames } from './form';
+import { buildInitialPartStates } from './engine';
+import type { VehicleMaintenanceState } from './types';
+const state: VehicleMaintenanceState = { modelId: 'honda-air-blade', odo: 5000, dustFlood: 'light', heavyLoad: 'occasional', configuredAt: '2026-01-01T00:00:00.000Z', lastOdoAt: '2026-01-01T00:00:00.000Z', odoHistory: [{ odo: 5000, at: '2026-01-01T00:00:00.000Z' }], defaultMonthlyKm: 800, partStates: buildInitialPartStates('honda-air-blade', 5000, {}, 800, { dustFlood: 'light', heavyLoad: 'occasional' }, new Date('2026-01-01T00:00:00.000Z')), skippedMonthKey: null };
+test('reopening form reflects saved state and unchanged submit preserves it', () => { const form = maintenanceToForm(state); expect(form.odoText).toBe('5000'); expect(applyForm(state, form, true)).toBe(state); });
+test('reports removed parts and marks new parts unknown', () => { expect(removedPartNames(state, 'honda-wave-alpha')).toContain('Dung dịch làm mát'); const next = applyForm(state, { ...maintenanceToForm(state), modelId: 'yamaha-exciter-155' }, true); expect(next.partStates.find((part) => part.partId === 'CHAIN_SPROCKET')?.source).toBe('unknown'); });

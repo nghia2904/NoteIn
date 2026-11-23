@@ -7,6 +7,7 @@ import { BottomTabBar, type MainTab } from '../components/BottomTabBar';
 import { CalendarTab } from '../components/CalendarTab';
 import { DailyTab } from '../components/DailyTab';
 import { OtherTab } from '../components/OtherTab';
+import { PeriodicTab } from '../components/PeriodicTab';
 import { WebWorkspace } from '../components/web/WebWorkspace';
 import { useNow } from '../hooks/useNow';
 import { translations } from '../i18n/translations';
@@ -202,6 +203,8 @@ export default function HomeScreen() {
           {activeTab === 'calendar' && (
             <CalendarTab now={now} onDataChange={reload} />
           )}
+
+          {activeTab === 'periodic' && <PeriodicTab />}
 
           {activeTab === 'other' && (
             <OtherTab

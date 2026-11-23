@@ -25,8 +25,8 @@ if (Platform.OS === 'android') {
       const isCurrentSchedule =
         notification.request.identifier === NOTIFICATION_ID;
       return {
-        shouldShowBanner: false,
-        shouldShowList: isCurrentSchedule,
+        shouldShowBanner: !isCurrentSchedule,
+        shouldShowList: true,
         shouldPlaySound: false,
         shouldSetBadge: false,
       };

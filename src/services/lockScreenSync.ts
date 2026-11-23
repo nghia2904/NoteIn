@@ -32,6 +32,14 @@ export interface LockScreenPayload {
     title: string;
     done: boolean;
   }[];
+  dailySchedule: {
+    id: string;
+    startMin: number;
+    endMin: number;
+    title: string;
+    note: string;
+    done: boolean;
+  }[];
   calendarDaysRaw: string[];
   calendarEvents: {
     id: string;
@@ -88,12 +96,17 @@ export function buildLockScreenPayload(
     progressPct = 0;
   }
 
+  const dailySchedule = dailyOnly.map((item) => ({
+    id: item.refId,
+    startMin: item.startMin,
+    endMin: item.endMin,
+    title: item.title,
+    note: item.note ?? '',
+    done: item.done,
+  }));
   const dailyItems = dailyOnly
-    .filter(
-      (item) =>
-        !(currentState.kind === 'current' && currentState.item.key === item.key),
-    )
-    .slice(0, 4)
+    .filter((item) => item.startMin > nowMin)
+    .slice(0, 2)
     .map((item) => ({
       id: item.refId,
       timeRange: `${formatTime(item.startMin)}-${formatTime(item.endMin)}`,
@@ -146,6 +159,7 @@ export function buildLockScreenPayload(
     currentTimeRange,
     progressPct,
     dailyItems,
+    dailySchedule,
     calendarDaysRaw,
     calendarEvents: todayEvents,
   };

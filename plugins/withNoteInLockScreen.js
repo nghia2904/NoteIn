@@ -983,6 +983,32 @@ const ANDROID_LAYOUT_EXPANDED = `<?xml version="1.0" encoding="utf-8"?>
     </LinearLayout>
   </LinearLayout>
 
+  <LinearLayout
+    android:id="@+id/upcoming_row_1"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginTop="6dp"
+    android:paddingHorizontal="9dp"
+    android:paddingVertical="5dp"
+    android:background="@drawable/notein_inner_card_daily">
+    <TextView android:id="@+id/txt_upcoming_1_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10sp" android:textStyle="bold" android:textColor="#FDE047" android:layout_marginEnd="8dp" />
+    <TextView android:id="@+id/txt_upcoming_1_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="11sp" android:textStyle="bold" android:textColor="#FFFFFF" android:singleLine="true" android:ellipsize="end" />
+  </LinearLayout>
+
+  <LinearLayout
+    android:id="@+id/upcoming_row_2"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:layout_marginTop="5dp"
+    android:paddingHorizontal="9dp"
+    android:paddingVertical="5dp"
+    android:background="@drawable/notein_inner_card_daily">
+    <TextView android:id="@+id/txt_upcoming_2_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10sp" android:textStyle="bold" android:textColor="#FDE047" android:layout_marginEnd="8dp" />
+    <TextView android:id="@+id/txt_upcoming_2_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="11sp" android:textStyle="bold" android:textColor="#FFFFFF" android:singleLine="true" android:ellipsize="end" />
+  </LinearLayout>
+
   <!-- Calendar Mode Full Container (Today's events only) -->
   <LinearLayout
     android:id="@+id/calendar_container"
@@ -1114,6 +1140,7 @@ const ANDROID_LAYOUT_EXPANDED = `<?xml version="1.0" encoding="utf-8"?>
 const ANDROID_HELPER_KT = `package com.bonhiki1233.notein.lockscreen
 
 import android.app.Notification
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -1121,6 +1148,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Build
+import java.util.Calendar
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -1140,6 +1168,83 @@ object NoteInLockScreenHelper {
   const val ACTION_TAB_DAILY = "com.bonhiki1233.notein.ACTION_TAB_DAILY"
   const val ACTION_TAB_CALENDAR = "com.bonhiki1233.notein.ACTION_TAB_CALENDAR"
   const val ACTION_NOOP = "com.bonhiki1233.notein.ACTION_NOOP"
+  const val ACTION_REFRESH = "com.bonhiki1233.notein.ACTION_REFRESH"
+
+  private fun timeText(minutes: Int): String {
+    return String.format("%02d:%02d", (minutes / 60) % 24, minutes % 60)
+  }
+
+  private fun withCurrentSchedule(raw: JSONObject): JSONObject {
+    val payload = JSONObject(raw.toString())
+    val schedule = payload.optJSONArray("dailySchedule") ?: return payload
+    if (schedule.length() == 0) return payload
+    val calendar = Calendar.getInstance()
+    val nowMin = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+    var selected: JSONObject? = null
+    var active = false
+    for (index in 0 until schedule.length()) {
+      val item = schedule.optJSONObject(index) ?: continue
+      if (item.optInt("startMin") <= nowMin && item.optInt("endMin") > nowMin) {
+        selected = item
+        active = true
+        break
+      }
+    }
+    if (selected == null) {
+      for (index in 0 until schedule.length()) {
+        val item = schedule.optJSONObject(index) ?: continue
+        if (item.optInt("startMin") > nowMin) {
+          selected = item
+          break
+        }
+      }
+    }
+    if (selected == null) selected = schedule.optJSONObject(0)
+    if (selected == null) return payload
+
+    val start = selected.optInt("startMin")
+    val end = selected.optInt("endMin")
+    val progress = if (active && end > start) ((nowMin - start) * 100 / (end - start)).coerceIn(0, 100) else 0
+    payload.put("currentTitle", selected.optString("title", "NoteIn"))
+    payload.put("currentNote", selected.optString("note", ""))
+    payload.put("currentTimeRange", "\${timeText(start)} - \${timeText(end)}")
+    payload.put("progressPct", progress)
+
+    val upcoming = JSONArray()
+    for (index in 0 until schedule.length()) {
+      val item = schedule.optJSONObject(index) ?: continue
+      if (item.optInt("startMin") > start && upcoming.length() < 2) {
+        upcoming.put(JSONObject().put("timeRange", "\${timeText(item.optInt("startMin"))}-\${timeText(item.optInt("endMin"))}").put("title", item.optString("title", "")))
+      }
+    }
+    payload.put("dailyItems", upcoming)
+    return payload
+  }
+
+  private fun scheduleRefresh(context: Context, payload: JSONObject) {
+    val schedule = payload.optJSONArray("dailySchedule") ?: return
+    val now = Calendar.getInstance()
+    val nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+    var nextMin = 24 * 60
+    for (index in 0 until schedule.length()) {
+      val item = schedule.optJSONObject(index) ?: continue
+      for (candidate in intArrayOf(item.optInt("startMin"), item.optInt("endMin"))) {
+        if (candidate > nowMin && candidate < nextMin) nextMin = candidate
+      }
+    }
+    val target = Calendar.getInstance().apply {
+      set(Calendar.SECOND, 0)
+      set(Calendar.MILLISECOND, 0)
+      if (nextMin >= 24 * 60) add(Calendar.DAY_OF_YEAR, 1)
+      set(Calendar.HOUR_OF_DAY, (nextMin % (24 * 60)) / 60)
+      set(Calendar.MINUTE, nextMin % 60)
+    }
+    val refreshIntent = Intent(context, NoteInLockScreenReceiver::class.java).apply { action = ACTION_REFRESH }
+    val refreshPi = PendingIntent.getBroadcast(context, 104, refreshIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    val alarm = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, refreshPi)
+    else alarm.set(AlarmManager.RTC_WAKEUP, target.timeInMillis, refreshPi)
+  }
 
   fun ensureChannel(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -1217,6 +1322,22 @@ object NoteInLockScreenHelper {
       rv.setTextViewText(R.id.txt_progress_label, progressLabel)
       rv.setProgressBar(R.id.progress_bar, 100, progressPct, false)
       rv.setTextViewText(R.id.txt_progress_pct, "\$progressPct%")
+
+      if (isExpanded) {
+        val upcoming: JSONArray = payload.optJSONArray("dailyItems") ?: JSONArray()
+        val first = upcoming.optJSONObject(0)
+        rv.setViewVisibility(R.id.upcoming_row_1, if (first == null) View.GONE else View.VISIBLE)
+        if (first != null) {
+          rv.setTextViewText(R.id.txt_upcoming_1_time, first.optString("timeRange", ""))
+          rv.setTextViewText(R.id.txt_upcoming_1_title, first.optString("title", ""))
+        }
+        val second = upcoming.optJSONObject(1)
+        rv.setViewVisibility(R.id.upcoming_row_2, if (second == null) View.GONE else View.VISIBLE)
+        if (second != null) {
+          rv.setTextViewText(R.id.txt_upcoming_2_time, second.optString("timeRange", ""))
+          rv.setTextViewText(R.id.txt_upcoming_2_title, second.optString("title", ""))
+        }
+      }
     } else {
       rv.setViewVisibility(R.id.daily_container, View.GONE)
       rv.setViewVisibility(R.id.calendar_container, View.VISIBLE)
@@ -1279,7 +1400,7 @@ object NoteInLockScreenHelper {
         .putBoolean(KEY_ENABLED, true)
         .apply()
 
-      val payload = JSONObject(payloadJson)
+      val payload = withCurrentSchedule(JSONObject(payloadJson))
       val pkg = context.packageName
 
       val dailyIntent = Intent(context, NoteInLockScreenReceiver::class.java).apply {
@@ -1325,6 +1446,7 @@ object NoteInLockScreenHelper {
 
       val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       nm.notify(NOTIFICATION_ID, notification)
+      scheduleRefresh(context, payload)
       return true
     } catch (e: Exception) {
       e.printStackTrace()
@@ -1371,6 +1493,9 @@ class NoteInLockScreenReceiver : BroadcastReceiver() {
       }
       NoteInLockScreenHelper.ACTION_NOOP -> {
         // Absorb stray tap on Lock Screen widget so app does not open
+      }
+      NoteInLockScreenHelper.ACTION_REFRESH -> {
+        NoteInLockScreenHelper.showOrUpdateWidget(context, payloadJson, null)
       }
     }
   }
@@ -1580,6 +1705,7 @@ module.exports = function withNoteInLockScreen(config) {
         <action android:name="com.bonhiki1233.notein.ACTION_TAB_DAILY"/>
         <action android:name="com.bonhiki1233.notein.ACTION_TAB_CALENDAR"/>
         <action android:name="com.bonhiki1233.notein.ACTION_NOOP"/>
+        <action android:name="com.bonhiki1233.notein.ACTION_REFRESH"/>
       </intent-filter>
     </receiver>\n  </application>`,
           );
